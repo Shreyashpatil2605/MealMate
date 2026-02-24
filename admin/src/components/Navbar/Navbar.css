@@ -1,0 +1,53 @@
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 4%;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 107, 53, 0.95) 0%,
+    rgba(240, 84, 42, 0.95) 100%
+  );
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 32px rgba(255, 107, 53, 0.15);
+  top: 0;
+  z-index: 100;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.navbar .logo {
+  width: max(10%, 2px);
+  transition: transform 0.3s ease;
+}
+
+.navbar .logo:hover {
+  transform: scale(1.05);
+}
+
+.navbar .profile {
+  width: 40px;
+  border-radius: 50%;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: transform 0.3s ease;
+}
+
+.navbar .profile:hover {
+  transform: scale(1.1);
+}
+
+.login-conditon {
+  display: none;
+}
+
+.login-conditon:hover {
+  display: none;
+}
+
+.admin-title {
+  font-size: 24px;
+  font-weight: 700;
+  color: white;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}

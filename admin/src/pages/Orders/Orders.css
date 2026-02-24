@@ -1,0 +1,117 @@
+.order-item {
+  display: grid;
+  grid-template-columns: 0.5fr 2fr 1fr 1fr 1fr;
+  align-items: start;
+  gap: 30px;
+  border: 2px solid rgba(255, 107, 53, 0.3);
+  padding: 28px 30px;
+  margin: 24px 0;
+  font-size: 14px;
+  color: #e0e0e0;
+  background: #2a2a2a;
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.order-item::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 4px;
+  width: 0;
+  background: linear-gradient(90deg, #ff6b35, #f05428);
+  transition: width 0.3s ease;
+}
+
+.order-item:hover {
+  box-shadow: 0 12px 36px rgba(255, 107, 53, 0.25);
+  border-color: rgba(255, 107, 53, 0.5);
+  transform: translateY(-2px);
+}
+
+.order-item:hover::before {
+  width: 100%;
+}
+
+.order-item-food {
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.order-item-food img {
+  width: 50px;
+  height: 50px;
+  border-radius: 8px;
+  object-fit: cover;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.order-item-name {
+  font-weight: 700;
+  color: #ff6b35;
+  margin-bottom: 8px;
+  font-size: 15px;
+}
+
+.order-item-address {
+  margin-bottom: 8px;
+  color: #888;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.order-item select {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 107, 53, 0.15) 0%,
+    rgba(240, 84, 42, 0.1) 100%
+  );
+  border: 2px solid rgba(255, 107, 53, 0.4);
+  width: max(11vw, 140px);
+  padding: 12px 14px;
+  outline: none;
+  border-radius: 8px;
+  font-family: Outfit;
+  font-weight: 500;
+  color: #e0e0e0;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.order-item select:hover {
+  border-color: rgba(255, 107, 53, 0.6);
+  background: linear-gradient(
+    135deg,
+    rgba(255, 107, 53, 0.2) 0%,
+    rgba(240, 84, 42, 0.15) 100%
+  );
+}
+
+.order-item select:focus {
+  border-color: #ff6b35;
+  box-shadow: 0 0 0 4px rgba(255, 107, 53, 0.1);
+}
+
+@media (max-width: 1000px) {
+  .order-item {
+    font-size: 12px;
+    grid-template-columns: 0.5fr 2fr 1fr;
+    padding: 20px 16px;
+    gap: 20px;
+  }
+  .order-item select {
+    padding: 10px 12px;
+    font-size: 12px;
+    width: max(15vw, 110px);
+  }
+  .order-item img {
+    width: 40px;
+    height: 40px;
+  }
+}

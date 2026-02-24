@@ -1,0 +1,75 @@
+@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&display=swap");
+
+* {
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+  font-family: Outfit;
+}
+body {
+  min-height: 100vh;
+  background-color: #0f0f0f;
+  background-image: 
+    /* Subtle horizontal lines */
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(255, 107, 53, 0.015) 2px,
+      rgba(255, 107, 53, 0.015) 4px
+    ),
+    /* Subtle vertical lines */
+    repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 2px,
+        rgba(255, 107, 53, 0.015) 2px,
+        rgba(255, 107, 53, 0.015) 4px
+      ),
+    /* Professional gradient accent - top left */
+    radial-gradient(
+        ellipse 800px 600px at 10% 15%,
+        rgba(255, 107, 53, 0.05) 0%,
+        transparent 60%
+      ),
+    /* Professional gradient accent - bottom right */
+    radial-gradient(
+        ellipse 600px 800px at 90% 85%,
+        rgba(255, 107, 53, 0.04) 0%,
+        transparent 70%
+      ),
+    /* Main professional gradient */
+    linear-gradient(135deg, #0f0f0f 0%, #1a1a1a 50%, #0f0f0f 100%);
+  background-attachment: fixed;
+  background-size:
+    100% 100%,
+    100% 100%,
+    100% 100%,
+    100% 100%,
+    100% 100%;
+  color: #e0e0e0;
+}
+a {
+  text-decoration: none;
+  color: inherit;
+}
+hr {
+  border: none;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 107, 53, 0.3) 0%,
+    transparent 100%
+  );
+}
+.app-content {
+  display: flex;
+}
+.flex-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cursor {
+  cursor: pointer;
+}

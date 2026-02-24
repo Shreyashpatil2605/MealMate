@@ -1,0 +1,345 @@
+.navbar {
+  /* vertical sidebar on left */
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 30px 10px;
+  background: linear-gradient(
+    135deg,
+    rgba(20, 20, 20, 0.95) 0%,
+    rgba(35, 35, 35, 0.95) 100%
+  );
+  backdrop-filter: blur(10px);
+  border-right: 1px solid rgba(34, 197, 94, 0.2);
+  box-shadow: 4px 0 20px rgba(0, 0, 0, 0.5);
+  z-index: 100;
+  transition: width 0.3s ease;
+}
+
+.navbar.collapsed {
+  width: 60px;
+}
+
+.navbar .logo {
+  width: 100px;
+  transition: transform 0.3s ease;
+  margin-bottom: 40px;
+}
+
+/* toggle button near top */
+.sidebar-toggle {
+  background: none;
+  border: none;
+  color: #e8e2e2;
+  font-size: 20px;
+  cursor: pointer;
+  margin-bottom: 20px;
+  transition: transform 0.3s ease;
+  position: relative;
+}
+
+/* glow effect for toggle too */
+.sidebar-toggle::after {
+  content: "";
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  right: -4px;
+  bottom: -4px;
+  background: rgba(34, 197, 94, 0.5);
+  border-radius: 50%;
+  filter: blur(8px);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: -1;
+}
+
+.sidebar-toggle:hover::after {
+  opacity: 1;
+}
+
+/* reduce logo when collapsed */
+.navbar.collapsed .logo {
+  width: 40px;
+  margin-bottom: 20px;
+}
+
+.navbar .logo:hover {
+  transform: scale(1.05);
+}
+
+.navbar-menu {
+  display: flex;
+  flex-direction: column;
+  list-style: none;
+  gap: 20px;
+  color: #e8e2e2;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+/* add glow effect to menu items similar to buttons */
+.navbar-menu a,
+.navbar-menu li {
+  position: relative;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+.navbar-menu a::after,
+.navbar-menu li::after {
+  content: "";
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  background: rgba(34, 197, 94, 0.5);
+  border-radius: 8px;
+  filter: blur(8px);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: -1;
+}
+.navbar-menu a:hover::after,
+.navbar-menu li:hover::after {
+  opacity: 1;
+}
+.navbar-menu a:hover,
+.navbar-menu li:hover {
+  background: rgba(34, 197, 94, 0.1);
+}
+
+.navbar.collapsed .sidebar-toggle {
+  transform: rotate(180deg);
+}
+
+.navbar-right {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  margin-top: auto; /* push to bottom */
+}
+
+/* collapse right section icons only */
+.navbar.collapsed .navbar-right button,
+.navbar.collapsed .navbar-right img {
+  width: 24px;
+  height: 24px;
+}
+.navbar.collapsed .navbar-right button {
+  padding: 4px;
+}
+
+.navbar button {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  font-size: 15px;
+  color: white;
+  border: none;
+  padding: 10px 28px;
+  border-radius: 25px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  font-weight: 600;
+  box-shadow: 0 4px 15px rgba(34, 197, 94, 0.2);
+  position: relative;
+}
+
+/* button glow effect similar to admin panel */
+.navbar button::after {
+  content: "";
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  background: rgba(34, 197, 94, 0.5);
+  border-radius: 50px;
+  filter: blur(8px);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: -1;
+}
+
+.navbar button:hover::after {
+  opacity: 1;
+}
+
+.navbar button:hover {
+  background: rgba(34, 197, 94, 0.4);
+}
+
+.navbar button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 25px rgba(34, 197, 94, 0.3);
+}
+
+.navbar button:active {
+  transform: translateY(0);
+}
+
+.navbar .active {
+  padding-bottom: 2px;
+  border-bottom: 3px solid #22c55e;
+  color: #22c55e;
+}
+
+.navbar li {
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.navbar li:hover {
+  color: #22c55e;
+}
+
+.navbar-search-icon {
+  position: relative;
+  cursor: pointer;
+  transition: transform 0.3s ease;
+}
+
+.navbar-search-icon:hover {
+  transform: scale(1.1);
+}
+
+.navbar-search-icon .dot {
+  position: absolute;
+  min-width: 10px;
+  min-height: 10px;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  border-radius: 50%;
+  top: -8px;
+  right: -8px;
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3);
+}
+
+.navbar-profile {
+  position: relative;
+  cursor: pointer;
+}
+
+.nav-profile-dropdown {
+  position: absolute;
+  display: none;
+  left: 0;
+  z-index: 1001;
+  bottom: 100%;
+  margin-bottom: 10px;
+  white-space: nowrap;
+}
+
+.navbar-profile:hover .nav-profile-dropdown,
+.nav-profile-dropdown.active {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #2a2a2a;
+  padding: 16px 24px;
+  border-radius: 12px;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  list-style: none;
+  backdrop-filter: blur(10px);
+}
+
+.nav-profile-dropdown li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  padding: 8px 4px;
+  transition: all 0.3s ease;
+  color: #ddd4d4;
+  font-weight: 500;
+}
+
+.nav-profile-dropdown img {
+  width: 20px;
+  transition: transform 0.3s ease;
+}
+
+.nav-profile-dropdown li:hover {
+  color: #22c55e;
+  transform: translateX(4px);
+}
+
+.nav-profile-dropdown li:hover img {
+  transform: scale(1.1);
+}
+
+@media (max-width: 1050px) {
+  .navbar .logo {
+    width: 140px;
+  }
+  .navbar-menu {
+    gap: 20px;
+    font-size: 15px;
+  }
+  .navbar-right {
+    gap: 30px;
+  }
+  .navbar-right img {
+    width: 22px;
+  }
+  .navbar-right button {
+    padding: 8px 24px;
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 900px) {
+  .navbar .logo {
+    width: 120px;
+  }
+  .navbar-menu {
+    gap: 15px;
+    font-size: 14px;
+  }
+  .navbar-right {
+    gap: 20px;
+  }
+  .navbar-right img {
+    width: 20px;
+  }
+  .navbar-right button {
+    padding: 7px 20px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 750px) {
+  .navbar {
+    width: 100%;
+    height: auto;
+    position: sticky;
+    flex-direction: row;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-right: none;
+    border-bottom: 1px solid rgba(34, 197, 94, 0.2);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  }
+  .navbar-menu {
+    display: flex;
+    flex-direction: row;
+    gap: 15px;
+  }
+  .navbar-right {
+    flex-direction: row;
+    gap: 30px;
+    margin-top: 0;
+  }
+  /* always show labels on mobile */
+  .navbar.collapsed .navbar-menu .label {
+    display: inline;
+  }
+}

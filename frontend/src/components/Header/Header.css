@@ -1,0 +1,82 @@
+.header {
+  height: 34vw;
+  margin: 30px auto;
+  background:
+    linear-gradient(
+      135deg,
+      rgba(34, 197, 94, 0.25) 0%,
+      rgba(22, 163, 74, 0.15) 100%
+    ),
+    url("/header_img.png") no-repeat;
+  background-size: cover;
+  background-position: center;
+  position: relative;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 12px 48px rgba(34, 197, 94, 0.2);
+}
+
+.header-contents {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  gap: 1.5vw;
+  max-width: 50%;
+  bottom: 10%;
+  left: 6vw;
+  animation: slideInUp 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.header-contents h2 {
+  font-weight: 700;
+  color: white;
+  font-size: max(4.5vw, 22px);
+  text-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.header-contents p {
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 1vw;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.header-contents button {
+  border: none;
+  color: white;
+  font-weight: 600;
+  padding: 1vw 2.3vw;
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  font-size: max(1vw, 13px);
+  border-radius: 50px;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 6px 20px rgba(34, 197, 94, 0.3);
+}
+
+.header-contents button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(34, 197, 94, 0.4);
+}
+
+.header-contents button:active {
+  transform: translateY(0);
+}
+
+@media (max-width: 1050px) {
+  .header-contents {
+    max-width: 45%;
+  }
+}
+
+@media (max-width: 750px) {
+  .header-contents {
+    max-width: 65%;
+  }
+  .header-contents p {
+    display: none;
+  }
+  .header-contents button {
+    padding: 2vw 4vw;
+  }
+}
