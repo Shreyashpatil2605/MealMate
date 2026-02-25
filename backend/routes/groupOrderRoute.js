@@ -4,10 +4,12 @@ import {
   joinGroupOrder,
   addItemToGroupOrder,
   removeItemFromGroupOrder,
+  updateItemQuantity,
   getGroupOrderDetails,
   finalizeGroupOrder,
   leaveGroupOrder,
   shareGroupLinkSms,
+  checkTwilioConfig,
 } from "../controllers/groupOrderController.js";
 
 const groupOrderRoute = express.Router();
@@ -16,9 +18,11 @@ groupOrderRoute.post("/create", createGroupOrder);
 groupOrderRoute.post("/join", joinGroupOrder);
 groupOrderRoute.post("/add-item", addItemToGroupOrder);
 groupOrderRoute.post("/remove-item", removeItemFromGroupOrder);
+groupOrderRoute.post("/update-quantity", updateItemQuantity);
 groupOrderRoute.post("/details", getGroupOrderDetails);
 groupOrderRoute.post("/finalize", finalizeGroupOrder);
 groupOrderRoute.post("/leave", leaveGroupOrder);
 groupOrderRoute.post("/share-sms", shareGroupLinkSms);
+groupOrderRoute.get("/check-twilio", checkTwilioConfig);
 
 export default groupOrderRoute;

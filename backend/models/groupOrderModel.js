@@ -14,6 +14,10 @@ const groupOrderSchema = new mongoose.Schema({
     {
       userId: String,
       userName: String,
+      isHost: {
+        type: Boolean,
+        default: false,
+      },
       joinedAt: {
         type: Date,
         default: Date.now,

@@ -23,6 +23,13 @@ const generateGroupCode = () => {
   return code;
 };
 
+// Helper function to get io instance and emit event
+const emitGroupUpdate = (io, groupCode, event, data) => {
+  if (io) {
+    io.to(groupCode).emit(event, data);
+  }
+};
+
 // Create a new group order
 const createGroupOrder = async (req, res) => {
   try {
@@ -50,12 +57,20 @@ const createGroupOrder = async (req, res) => {
         {
           userId,
           userName,
+          isHost: true,
         },
       ],
       items: [],
     });
 
     await newGroupOrder.save();
+
+    // Emit socket event for group creation
+    const io = req.app.get("io");
+    emitGroupUpdate(io, groupCode, "group-created", {
+      groupCode,
+      groupOrder: newGroupOrder,
+    });
 
     return res.json({
       success: true,
@@ -119,6 +134,14 @@ const joinGroupOrder = async (req, res) => {
     });
 
     await groupOrder.save();
+
+    // Emit socket event for new member join
+    const io = req.app.get("io");
+    emitGroupUpdate(io, groupCode, "member-joined", {
+      groupCode,
+      member: { userId, userName },
+      members: groupOrder.members,
+    });
 
     return res.json({
       success: true,
@@ -198,6 +221,15 @@ const addItemToGroupOrder = async (req, res) => {
 
     await groupOrder.save();
 
+    // Emit socket event for item added
+    const io = req.app.get("io");
+    emitGroupUpdate(io, groupCode, "item-added", {
+      groupCode,
+      item: { userId, userName, itemId, itemName, price, quantity },
+      items: groupOrder.items,
+      members: groupOrder.members,
+    });
+
     return res.json({
       success: true,
       message: "Item added to group order",
@@ -240,6 +272,14 @@ const removeItemFromGroupOrder = async (req, res) => {
 
     await groupOrder.save();
 
+    // Emit socket event for item removed
+    const io = req.app.get("io");
+    emitGroupUpdate(io, groupCode, "item-removed", {
+      groupCode,
+      item: { userId, itemId },
+      items: groupOrder.items,
+    });
+
     return res.json({
       success: true,
       message: "Item removed from group order",
@@ -250,6 +290,72 @@ const removeItemFromGroupOrder = async (req, res) => {
     return res.json({
       success: false,
       message: "Error removing item",
+    });
+  }
+};
+
+// Update item quantity in group order
+const updateItemQuantity = async (req, res) => {
+  try {
+    const { groupCode, userId, itemId, quantity } = req.body;
+
+    if (!groupCode || !userId || !itemId || quantity === undefined) {
+      return res.json({
+        success: false,
+        message: "Required parameters missing",
+      });
+    }
+
+    const groupOrder = await groupOrderModel.findOne({ groupCode });
+
+    if (!groupOrder) {
+      return res.json({
+        success: false,
+        message: "Group order not found",
+      });
+    }
+
+    // Find and update item
+    const item = groupOrder.items.find(
+      (item) => item.userId === userId && item.itemId === itemId,
+    );
+
+    if (!item) {
+      return res.json({
+        success: false,
+        message: "Item not found",
+      });
+    }
+
+    if (quantity < 1) {
+      // Remove item if quantity is 0
+      groupOrder.items = groupOrder.items.filter(
+        (i) => !(i.userId === userId && i.itemId === itemId),
+      );
+    } else {
+      item.quantity = quantity;
+    }
+
+    await groupOrder.save();
+
+    // Emit socket event for item updated
+    const io = req.app.get("io");
+    emitGroupUpdate(io, groupCode, "item-updated", {
+      groupCode,
+      item: { userId, itemId, quantity },
+      items: groupOrder.items,
+    });
+
+    return res.json({
+      success: true,
+      message: "Item quantity updated",
+      data: groupOrder,
+    });
+  } catch (error) {
+    console.error("Error updating quantity:", error);
+    return res.json({
+      success: false,
+      message: "Error updating quantity",
     });
   }
 };
@@ -275,30 +381,36 @@ const getGroupOrderDetails = async (req, res) => {
       });
     }
 
-    // Calculate totals per person
+    // Calculate totals per person - ensure price is always a number
     const splitByUser = {};
     let grandTotal = 0;
 
-    groupOrder.items.forEach((item) => {
-      const itemTotal = item.price * item.quantity;
-      grandTotal += itemTotal;
+    if (groupOrder.items && groupOrder.items.length > 0) {
+      groupOrder.items.forEach((item) => {
+        // Ensure price and quantity are numbers
+        const price = Number(item.price) || 0;
+        const quantity = Number(item.quantity) || 0;
+        const itemTotal = price * quantity;
+        
+        grandTotal += itemTotal;
 
-      if (!splitByUser[item.userId]) {
-        splitByUser[item.userId] = {
-          userName: item.userName,
-          total: 0,
-          items: [],
-        };
-      }
+        if (!splitByUser[item.userId]) {
+          splitByUser[item.userId] = {
+            userName: item.userName,
+            total: 0,
+            items: [],
+          };
+        }
 
-      splitByUser[item.userId].total += itemTotal;
-      splitByUser[item.userId].items.push({
-        itemName: item.itemName,
-        quantity: item.quantity,
-        price: item.price,
-        total: itemTotal,
+        splitByUser[item.userId].total += itemTotal;
+        splitByUser[item.userId].items.push({
+          itemName: item.itemName,
+          quantity: quantity,
+          price: price,
+          total: itemTotal,
+        });
       });
-    });
+    }
 
     const splitData = Object.entries(splitByUser).map(([userId, data]) => ({
       userId,
@@ -327,8 +439,6 @@ const getGroupOrderDetails = async (req, res) => {
 };
 
 // Finalize group order (before checkout)
-// Supports 'split' payments (each member pays their share) or 'single_payer' where one user pays the whole amount.
-// Expects: { groupCode, paymentOption: 'split'|'single_payer', frontendUrl, payerId (optional) }
 const finalizeGroupOrder = async (req, res) => {
   try {
     const {
@@ -374,11 +484,9 @@ const finalizeGroupOrder = async (req, res) => {
       });
     });
 
-    // Prepare response structure
     const paymentSessions = [];
 
     if (paymentOption === "single_payer") {
-      // payerId must be provided
       if (!payerId) {
         return res.json({
           success: false,
@@ -386,7 +494,6 @@ const finalizeGroupOrder = async (req, res) => {
         });
       }
 
-      // create a combined order for payer with all items
       const combinedItems = groupOrder.items.map((it) => ({
         name: it.itemName,
         price: it.price,
@@ -401,7 +508,6 @@ const finalizeGroupOrder = async (req, res) => {
       });
       await newOrder.save();
 
-      // create stripe session if frontendUrl provided
       let sessionUrl = null;
       if (frontendUrl && process.env.STRIPE_SECRET_KEY) {
         const line_items = combinedItems.map((item) => ({
@@ -412,7 +518,6 @@ const finalizeGroupOrder = async (req, res) => {
           },
           quantity: item.quantity,
         }));
-        // optional delivery charge
         line_items.push({
           price_data: {
             currency: "usd",
@@ -431,7 +536,6 @@ const finalizeGroupOrder = async (req, res) => {
         sessionUrl = session.url;
       }
 
-      // store order reference on groupOrder
       groupOrder.orders = [
         {
           userId: payerId,
@@ -445,6 +549,13 @@ const finalizeGroupOrder = async (req, res) => {
       groupOrder.status = "completed";
       await groupOrder.save();
 
+      const io = req.app.get("io");
+      emitGroupUpdate(io, groupCode, "group-finalized", {
+        groupCode,
+        status: "completed",
+        groupOrder,
+      });
+
       return res.json({
         success: true,
         message: "Group finalized (single payer)",
@@ -452,7 +563,7 @@ const finalizeGroupOrder = async (req, res) => {
       });
     }
 
-    // Default: split payments (per-user orders and sessions)
+    // Default: split payments
     for (const [userId, data] of Object.entries(splitByUser)) {
       const itemsForUser = data.items.map((it) => ({
         name: it.itemName,
@@ -469,7 +580,6 @@ const finalizeGroupOrder = async (req, res) => {
       });
       await newOrder.save();
 
-      // create stripe session if frontendUrl provided
       let sessionUrl = null;
       if (frontendUrl && process.env.STRIPE_SECRET_KEY) {
         const line_items = itemsForUser.map((item) => ({
@@ -516,6 +626,13 @@ const finalizeGroupOrder = async (req, res) => {
     groupOrder.status = "completed";
     await groupOrder.save();
 
+    const io = req.app.get("io");
+    emitGroupUpdate(io, groupCode, "group-finalized", {
+      groupCode,
+      status: "completed",
+      paymentSessions,
+    });
+
     return res.json({
       success: true,
       message: "Group finalized (split)",
@@ -551,20 +668,25 @@ const leaveGroupOrder = async (req, res) => {
       });
     }
 
-    // Remove user from members
     groupOrder.members = groupOrder.members.filter((m) => m.userId !== userId);
-
-    // Remove user's items
     groupOrder.items = groupOrder.items.filter(
       (item) => item.userId !== userId,
     );
 
-    // If no members left, mark as cancelled
     if (groupOrder.members.length === 0) {
       groupOrder.status = "cancelled";
     }
 
     await groupOrder.save();
+
+    const io = req.app.get("io");
+    emitGroupUpdate(io, groupCode, "member-left", {
+      groupCode,
+      userId,
+      members: groupOrder.members,
+      items: groupOrder.items,
+      status: groupOrder.status,
+    });
 
     return res.json({
       success: true,
@@ -592,6 +714,16 @@ const shareGroupLinkSms = async (req, res) => {
       });
     }
 
+    // Validate phone number format
+    const phoneRegex = /^\+?[1-9]\d{1,14}$/;
+    const cleanPhone = phoneNumber.replace(/[\s\-\(\)]/g, '');
+    if (!phoneRegex.test(cleanPhone)) {
+      return res.json({
+        success: false,
+        message: "Invalid phone number format. Please use E.164 format (e.g., +1234567890)",
+      });
+    }
+
     const groupOrder = await groupOrderModel.findOne({ groupCode });
     if (!groupOrder) {
       return res.json({ success: false, message: "Group order not found" });
@@ -601,12 +733,11 @@ const shareGroupLinkSms = async (req, res) => {
     if (!client) {
       return res.json({
         success: false,
-        message: "Twilio not configured on server",
+        message: "SMS service is not configured. Please contact the administrator.",
       });
     }
 
-    const frontend =
-      frontendUrl || process.env.FRONTEND_URL || "http://localhost:5173";
+    const frontend = frontendUrl || process.env.FRONTEND_URL || "http://localhost:5173";
     const link = `${frontend}/group-order?code=${groupCode}`;
     const body = `You're invited to join a group order (${groupCode}). Join here: ${link}`;
 
@@ -614,25 +745,91 @@ const shareGroupLinkSms = async (req, res) => {
     if (!fromNumber) {
       return res.json({
         success: false,
-        message: "TWILIO_PHONE_NUMBER not set",
+        message: "SMS sender number not configured. Please contact the administrator.",
       });
     }
 
     const message = await client.messages.create({
       body,
       from: fromNumber,
-      to: phoneNumber,
+      to: cleanPhone,
     });
 
     return res.json({
       success: true,
-      message: "SMS sent",
+      message: "SMS sent successfully",
       data: { sid: message.sid },
     });
   } catch (error) {
     console.error("Error sending SMS:", error);
-    return res.json({ success: false, message: "Error sending SMS" });
+    
+    if (error.code) {
+      switch (error.code) {
+        case 20003:
+          return res.json({ 
+            success: false, 
+            message: "Twilio authentication failed. Please contact the administrator." 
+          });
+        case 20404:
+          return res.json({ 
+            success: false, 
+            message: "Invalid sender number. Please contact the administrator." 
+          });
+        case 21211:
+        case 21601:
+        case 21614:
+          return res.json({ 
+            success: false, 
+            message: "Invalid phone number. Please check and try again." 
+          });
+        case 29999:
+          return res.json({ 
+            success: false, 
+            message: "Twilio account issue. Please contact the administrator." 
+          });
+        default:
+          if (error.message && error.message.includes("not a valid phone number")) {
+            return res.json({ 
+              success: false, 
+              message: "Invalid phone number. Please check and try again." 
+            });
+          }
+      }
+    }
+    
+    if (error.message && error.message.includes("ENOTFOUND")) {
+      return res.json({ 
+        success: false, 
+        message: "Unable to connect to SMS service. Please check your internet connection." 
+      });
+    }
+    
+    if (error.message && error.message.includes("ETIMEDOUT")) {
+      return res.json({ 
+        success: false, 
+        message: "SMS service request timed out. Please try again." 
+      });
+    }
+    
+    return res.json({ 
+      success: false, 
+      message: "Failed to send SMS. Please try again later or use an alternative method to share the link." 
+    });
   }
+};
+
+// Check if Twilio is configured
+const checkTwilioConfig = async (req, res) => {
+  const sid = process.env.TWILIO_ACCOUNT_SID;
+  const token = process.env.TWILIO_AUTH_TOKEN;
+  const phoneNumber = process.env.TWILIO_PHONE_NUMBER;
+  
+  const isConfigured = !!(sid && token && phoneNumber);
+  
+  return res.json({
+    success: true,
+    configured: isConfigured,
+  });
 };
 
 export {
@@ -640,8 +837,10 @@ export {
   joinGroupOrder,
   addItemToGroupOrder,
   removeItemFromGroupOrder,
+  updateItemQuantity,
   getGroupOrderDetails,
   finalizeGroupOrder,
   leaveGroupOrder,
   shareGroupLinkSms,
+  checkTwilioConfig,
 };
