@@ -144,7 +144,7 @@
 }
 
 .copy-btn {
-  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  background: linear-gradient(135deg, #000000 0%, #16a34a 100%);
   color: white;
   border: none;
   padding: 10px 20px;

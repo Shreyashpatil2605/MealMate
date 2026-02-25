@@ -832,6 +832,56 @@ const checkTwilioConfig = async (req, res) => {
   });
 };
 
+// Save chat message to MongoDB
+const saveChatMessage = async (groupCode, userId, userName, message) => {
+  try {
+    const groupOrder = await groupOrderModel.findOne({ groupCode });
+    if (!groupOrder) {
+      console.error("Group order not found for chat message");
+      return null;
+    }
+
+    if (!groupOrder.chatMessages) {
+      groupOrder.chatMessages = [];
+    }
+
+    groupOrder.chatMessages.push({
+      userId,
+      userName,
+      message,
+      timestamp: new Date(),
+    });
+
+    await groupOrder.save();
+    return groupOrder.chatMessages;
+  } catch (error) {
+    console.error("Error saving chat message:", error);
+    return null;
+  }
+};
+
+// Get chat messages for a group
+const getChatMessages = async (req, res) => {
+  try {
+    const { groupCode } = req.body;
+
+    if (!groupCode) {
+      return res.json({ success: false, message: "Group code required" });
+    }
+
+    const groupOrder = await groupOrderModel.findOne({ groupCode });
+
+    if (!groupOrder) {
+      return res.json({ success: false, message: "Group order not found" });
+    }
+
+    return res.json({ success: true, messages: groupOrder.chatMessages || [] });
+  } catch (error) {
+    console.error("Error getting chat messages:", error);
+    return res.json({ success: false, message: "Error getting chat messages" });
+  }
+};
+
 export {
   createGroupOrder,
   joinGroupOrder,
@@ -843,4 +893,6 @@ export {
   leaveGroupOrder,
   shareGroupLinkSms,
   checkTwilioConfig,
+  saveChatMessage,
+  getChatMessages,
 };

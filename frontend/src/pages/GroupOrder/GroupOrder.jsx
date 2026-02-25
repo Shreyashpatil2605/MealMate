@@ -88,8 +88,22 @@ const GroupOrder = () => {
   const [twilioConfigured, setTwilioConfigured] = useState(true);
   const [showQRCode, setShowQRCode] = useState(false);
 
+  // State for group chat
+  const [showChat, setShowChat] = useState(false);
+  const [chatMessages, setChatMessages] = useState([]);
+const [chatInput, setChatInput] = useState("");
+  const chatMessagesEndRef = useRef(null);
+  const chatInputRef = useRef(null);
+
   // Socket reference
   const socketRef = useRef(null);
+
+  // Scroll to bottom of chat when new messages arrive
+  useEffect(() => {
+    if (chatMessagesEndRef.current) {
+      chatMessagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [chatMessages, showChat]);
 
   // Check Twilio configuration on mount
   useEffect(() => {
@@ -322,6 +336,19 @@ const GroupOrder = () => {
       }
     });
 
+    // Chat message handler
+socket.on("chat-message", (data) => {
+      if (data.groupCode === currentGroup) {
+        setChatMessages((prev) => [...prev, data]);
+        // Show popup notification for new messages (only if not from current user)
+        if (data.userId !== getUserId()) {
+          toast.info(`💬 ${data.userName}: ${data.message.substring(0, 30)}${data.message.length > 30 ? '...' : ''}`);
+        }
+      }
+    });
+
+    // Fetch chat messages from MongoDB when joining group
+    fetchChatMessages();
     fetchGroupDetails();
 
     return () => {
@@ -330,9 +357,40 @@ const GroupOrder = () => {
       socket.off("item-removed");
       socket.off("member-left");
       socket.off("group-finalized");
+      socket.off("chat-message");
       socket.emit("leave-group", currentGroup);
     };
   }, [currentGroup]);
+
+  // Send chat message
+  const sendChatMessage = () => {
+    if (!chatInput.trim() || !currentGroup) return;
+
+    const messageData = {
+      groupCode: currentGroup,
+      userId: getUserId(),
+      userName: getCurrentUserName(),
+      message: chatInput.trim(),
+      timestamp: new Date().toISOString(),
+    };
+
+socketRef.current.emit("chat-message", messageData);
+    setChatInput("");
+    // Focus back on input after sending
+    setTimeout(() => {
+      if (chatInputRef.current) {
+        chatInputRef.current.focus();
+      }
+    }, 0);
+  };
+
+  // Handle chat input key press
+  const handleChatKeyPress = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendChatMessage();
+    }
+  };
 
   // detect new members and show toast notification
   useEffect(() => {
@@ -424,7 +482,7 @@ const GroupOrder = () => {
     }
   };
 
-  // Get group details
+// Get group details
   const fetchGroupDetails = async () => {
     try {
       if (!currentGroup) return;
@@ -444,6 +502,21 @@ const GroupOrder = () => {
       }
     } catch (error) {
       console.error("Error fetching group details:", error);
+    }
+  };
+
+  // Fetch chat messages from MongoDB
+  const fetchChatMessages = async () => {
+    try {
+      if (!currentGroup) return;
+      const response = await axios.post(url + "/api/group-order/chat-messages", {
+        groupCode: currentGroup,
+      });
+      if (response.data.success && response.data.messages) {
+        setChatMessages(response.data.messages);
+      }
+    } catch (error) {
+      console.error("Error fetching chat messages:", error);
     }
   };
 
@@ -580,6 +653,13 @@ const GroupOrder = () => {
     return date.toLocaleDateString();
   };
 
+  // Format chat time
+  const formatChatTime = (timestamp) => {
+    if (!timestamp) return "";
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
   // Copy share link
   const handleCopyShareLink = () => {
     const shareLink = `${window.location.origin}/group-order?code=${currentGroup}`;
@@ -688,6 +768,181 @@ const GroupOrder = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Chat Modal Component
+  const ChatModal = () => {
+    if (!showChat) return null;
+
+    return (
+      <div
+        style={{
+          position: "fixed",
+          top: 0,
+          right: 0,
+          width: "380px",
+          height: "100%",
+          backgroundColor: "#1a1a1a",
+          boxShadow: "-4px 0 20px rgba(0,0,0,0.5)",
+          zIndex: 1001,
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        {/* Chat Header */}
+        <div
+          style={{
+            padding: "16px 20px",
+            backgroundColor: "#22c55e",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <h3 style={{ margin: 0, color: "white", fontSize: "18px" }}>
+            💬 Group Chat
+          </h3>
+          <button
+            onClick={() => setShowChat(false)}
+            style={{
+              background: "none",
+              border: "none",
+              color: "white",
+              fontSize: "24px",
+              cursor: "pointer",
+              padding: "0",
+              lineHeight: 1,
+            }}
+          >
+            ×
+          </button>
+        </div>
+
+        {/* Chat Messages */}
+        <div
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            padding: "16px",
+            display: "flex",
+            flexDirection: "column",
+            gap: "12px",
+          }}
+        >
+          {chatMessages.length === 0 ? (
+            <p
+              style={{
+                textAlign: "center",
+                color: "#666",
+                marginTop: "40px",
+              }}
+            >
+              No messages yet. Start the conversation! 💬
+            </p>
+          ) : (
+            chatMessages.map((msg, index) => {
+              const isMe = msg.userId === getUserId();
+              return (
+                <div
+                  key={index}
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: isMe ? "flex-end" : "flex-start",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      marginBottom: "4px",
+                    }}
+                  >
+                    <span
+                      style={{
+                        color: isMe ? "#22c55e" : "#888",
+                        fontSize: "12px",
+                        fontWeight: "600",
+                      }}
+                    >
+                      {isMe ? "You" : msg.userName}
+                    </span>
+                    <span style={{ color: "#555", fontSize: "10px" }}>
+                      {formatChatTime(msg.timestamp)}
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      maxWidth: "80%",
+                      padding: "10px 14px",
+                      borderRadius: isMe
+                        ? "16px 16px 4px 16px"
+                        : "16px 16px 16px 4px",
+                      backgroundColor: isMe ? "#22c55e" : "#333",
+                      color: "white",
+                      fontSize: "14px",
+                      wordBreak: "break-word",
+                    }}
+                  >
+                    {msg.message}
+                  </div>
+                </div>
+              );
+            })
+          )}
+          <div ref={chatMessagesEndRef} />
+        </div>
+
+        {/* Chat Input */}
+        <div
+          style={{
+            padding: "16px",
+            borderTop: "1px solid #333",
+            display: "flex",
+            gap: "10px",
+          }}
+        >
+<input
+            key="chat-input"
+            ref={chatInputRef}
+            type="text"
+            value={chatInput}
+            onChange={(e) => setChatInput(e.target.value)}
+            onKeyPress={handleChatKeyPress}
+            placeholder="Type a message..."
+            style={{
+              flex: 1,
+              padding: "12px 16px",
+              borderRadius: "24px",
+              border: "none",
+              backgroundColor: "#333",
+              color: "white",
+              fontSize: "14px",
+              outline: "none",
+            }}
+            autoFocus
+          />
+          <button
+            onClick={sendChatMessage}
+            disabled={!chatInput.trim()}
+            style={{
+              padding: "12px 20px",
+              borderRadius: "24px",
+              border: "none",
+              backgroundColor: chatInput.trim() ? "#22c55e" : "#444",
+              color: "white",
+              fontSize: "14px",
+              fontWeight: "600",
+              cursor: chatInput.trim() ? "pointer" : "not-allowed",
+              transition: "background 0.2s",
+            }}
+          >
+            Send
+          </button>
+        </div>
+      </div>
+    );
   };
 
   // Conditional render - NOW all hooks are called before this
@@ -857,21 +1112,29 @@ const GroupOrder = () => {
   return (
     <div className="group-order-container">
       <QRCodeModal />
+      <ChatModal />
       <div className="group-header">
         <h1>Group Order: {currentGroup}</h1>
         <div style={{ display: "flex", gap: 8 }}>
+          <button
+            className={`copy-btn ${showChat ? 'active' : ''}`}
+            onClick={() => setShowChat(!showChat)}
+            style={showChat ? { backgroundColor: '#22c55e' } : {}}
+          >
+            Chat {chatMessages.length > 0 && `(${chatMessages.length})`}
+          </button>
           <button className="copy-btn" onClick={() => setShowQRCode(true)}>
-            📱 QR Code
+             QR Code
           </button>
           <button className="copy-btn" onClick={handleCopyShareLink}>
-            📋 Copy Link
+             Copy Link
           </button>
           <button className="copy-btn" onClick={handleShareWhatsApp}>
-            📲 WhatsApp
+             WhatsApp
           </button>
           {twilioConfigured && (
             <button className="copy-btn" onClick={handleSendSmsServer}>
-              ✉️ SMS
+               SMS
             </button>
           )}
         </div>

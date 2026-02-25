@@ -10,7 +10,6 @@ import cartRouter from "./routes/cartRoute.js";
 import orderRouter from "./routes/orderRoute.js";
 import recommendationRoute from "./routes/recommendationRoute.js";
 import groupOrderRoute from "./routes/groupOrderRoute.js";
-import groupOrderModel from "./models/groupOrderModel.js";
 
 // app config
 const app = express();
@@ -44,30 +43,11 @@ io.on('connection', (socket) => {
     console.log(`Socket ${socket.id} left group: ${groupCode}`);
   });
 
-  // Handle chat messages with MongoDB persistence
-  socket.on('chat-message', async (data) => {
+  // Handle chat messages
+  socket.on('chat-message', (data) => {
     const { groupCode, userId, userName, message, timestamp } = data;
-    
-    // Save message to MongoDB
-    try {
-      const groupOrder = await groupOrderModel.findOne({ groupCode });
-      if (groupOrder) {
-        if (!groupOrder.chatMessages) groupOrder.chatMessages = [];
-        groupOrder.chatMessages.push({
-          userId,
-          userName,
-          message,
-          timestamp: timestamp || new Date()
-        });
-        await groupOrder.save();
-        console.log(`Chat message saved to DB for group ${groupCode}`);
-      }
-    } catch (error) {
-      console.error('Error saving chat message to DB:', error);
-    }
-    
-    // Broadcast message to all members in the group room
     if (groupCode) {
+      // Broadcast message to all members in the group room
       io.to(groupCode).emit('chat-message', {
         groupCode,
         userId,

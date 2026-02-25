@@ -10,6 +10,7 @@ import {
   leaveGroupOrder,
   shareGroupLinkSms,
   checkTwilioConfig,
+  getChatMessages,
 } from "../controllers/groupOrderController.js";
 
 const groupOrderRoute = express.Router();
@@ -24,5 +25,6 @@ groupOrderRoute.post("/finalize", finalizeGroupOrder);
 groupOrderRoute.post("/leave", leaveGroupOrder);
 groupOrderRoute.post("/share-sms", shareGroupLinkSms);
 groupOrderRoute.get("/check-twilio", checkTwilioConfig);
+groupOrderRoute.post("/chat-messages", getChatMessages);
 
 export default groupOrderRoute;
