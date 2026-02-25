@@ -53,7 +53,7 @@ const groupOrderSchema = new mongoose.Schema({
     type: Date,
     default: () => new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
   },
-  // Orders created when group is finalized
+// Orders created when group is finalized
   orders: [
     {
       userId: String,
@@ -61,6 +61,18 @@ const groupOrderSchema = new mongoose.Schema({
       amount: Number,
       paid: { type: Boolean, default: false },
       sessionUrl: String,
+    },
+  ],
+  // Chat messages for persistent storage
+  chatMessages: [
+    {
+      userId: String,
+      userName: String,
+      message: String,
+      timestamp: {
+        type: Date,
+        default: Date.now,
+      },
     },
   ],
 });
