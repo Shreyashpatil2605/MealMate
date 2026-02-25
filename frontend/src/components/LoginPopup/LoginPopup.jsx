@@ -6,7 +6,8 @@ import axios from "axios";
 import { toast } from "react-toastify";
 
 const LoginPopup = ({ setShowLogin }) => {
-  const {url, setToken } = useContext(StoreContext);
+  const { url, setToken, setUserName, setShowWelcome } =
+    useContext(StoreContext);
   const [currentState, setCurrentState] = useState("Login");
   const [data, setData] = useState({
     name: "",
@@ -32,9 +33,15 @@ const LoginPopup = ({ setShowLogin }) => {
     if (response.data.success) {
       setToken(response.data.token);
       localStorage.setItem("token", response.data.token);
-      toast.success("Login Successfully")
-      setShowLogin(false);
-    }else{
+      const name =
+        response.data.name || (currentState === "Sign Up" ? data.name : "User");
+      setUserName(name);
+      setShowWelcome(true);
+      // Use setTimeout to allow the WelcomePopup to render before closing the LoginPopup
+      setTimeout(() => {
+        setShowLogin(false);
+      }, 100);
+    } else {
       toast.error(response.data.message);
     }
   };

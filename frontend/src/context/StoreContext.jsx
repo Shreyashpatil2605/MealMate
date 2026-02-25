@@ -8,6 +8,8 @@ const StoreContextProvider = (props) => {
   const [cartItems, setCartItems] = useState({});
   const url = "http://localhost:4000";
   const [token, setToken] = useState("");
+  const [userName, setUserName] = useState("");
+  const [showWelcome, setShowWelcome] = useState(false);
   const [food_list, setFoodList] = useState([]);
 
   const addToCart = async (itemId) => {
@@ -128,6 +130,10 @@ const StoreContextProvider = (props) => {
     url,
     token,
     setToken,
+    userName,
+    setUserName,
+    showWelcome,
+    setShowWelcome,
   };
   return (
     <StoreContext.Provider value={contextValue}>
