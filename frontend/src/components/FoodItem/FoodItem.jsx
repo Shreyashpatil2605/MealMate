@@ -1,13 +1,11 @@
-import React, { useContext, useState } from "react";
+import React, { useContext } from "react";
 import "./FoodItem.css";
 import { assets } from "../../assets/frontend_assets/assets";
 import { StoreContext } from "../../context/StoreContext";
-import AddItemModal from "../AddItemModal/AddItemModal";
 
 const FoodItem = ({ id, name, price, description, image }) => {
   const { cartItems, addToCart, removeFromCart, url } =
     useContext(StoreContext);
-  const [isModalOpen, setIsModalOpen] = useState(false);
 
   return (
     <div className="food-item">
@@ -20,7 +18,7 @@ const FoodItem = ({ id, name, price, description, image }) => {
         {!cartItems[id] ? (
           <img
             className="add"
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => addToCart(id)}
             src={assets.add_icon_white}
             alt=""
           />
@@ -48,14 +46,6 @@ const FoodItem = ({ id, name, price, description, image }) => {
         <p className="food-item-desc">{description}</p>
         <p className="food-item-price">${price}</p>
       </div>
-      <AddItemModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        itemId={id}
-        itemName={name}
-        price={price}
-        image={url + "/images/" + image}
-      />
     </div>
   );
 };
