@@ -106,6 +106,21 @@ const Navbar = ({ setShowLogin }) => {
             contact us
           </a>
         </li>
+        <li className="navbar-dropdown">
+          <span className={menu === "past-orders" ? "active" : ""} onClick={() => setMenu("past-orders")}>
+            Past Orders ▾
+          </span>
+          <ul className="navbar-dropdown-menu">
+            <li onClick={() => {
+              navigate("/myorders");
+              window.scrollTo(0, 0);
+            }}>Your Order History</li>
+            <li onClick={() => {
+              navigate("/group-order");
+              window.scrollTo(0, 0);
+            }}>Your Group Orders History</li>
+          </ul>
+        </li>
       </ul>
       <div className="navbar-right">
         <img src={assets.search_icon} alt="" />

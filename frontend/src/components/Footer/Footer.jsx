@@ -26,6 +26,13 @@ const Footer = () => {
           </ul>
         </div>
         <div className="footer-content-right">
+          <h2>Past Orders</h2>
+          <ul>
+            <li><Link to="/myorders">Order History</Link></li>
+            <li><Link to="/group-order">Previous Group Orders</Link></li>
+          </ul>
+        </div>
+        <div className="footer-content-contact">
           <h2>Contact Us</h2>
           <ul>
             <li><Link to="/app-download">Mobile App</Link></li>
