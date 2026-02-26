@@ -91,7 +91,7 @@ const GroupOrder = () => {
   // State for group chat
   const [showChat, setShowChat] = useState(false);
   const [chatMessages, setChatMessages] = useState([]);
-const [chatInput, setChatInput] = useState("");
+  const [chatInput, setChatInput] = useState("");
   const chatMessagesEndRef = useRef(null);
   const chatInputRef = useRef(null);
 
@@ -337,12 +337,14 @@ const [chatInput, setChatInput] = useState("");
     });
 
     // Chat message handler
-socket.on("chat-message", (data) => {
+    socket.on("chat-message", (data) => {
       if (data.groupCode === currentGroup) {
         setChatMessages((prev) => [...prev, data]);
         // Show popup notification for new messages (only if not from current user)
         if (data.userId !== getUserId()) {
-          toast.info(`💬 ${data.userName}: ${data.message.substring(0, 30)}${data.message.length > 30 ? '...' : ''}`);
+          toast.info(
+            `💬 ${data.userName}: ${data.message.substring(0, 30)}${data.message.length > 30 ? "..." : ""}`,
+          );
         }
       }
     });
@@ -374,7 +376,7 @@ socket.on("chat-message", (data) => {
       timestamp: new Date().toISOString(),
     };
 
-socketRef.current.emit("chat-message", messageData);
+    socketRef.current.emit("chat-message", messageData);
     setChatInput("");
     // Focus back on input after sending
     setTimeout(() => {
@@ -482,7 +484,7 @@ socketRef.current.emit("chat-message", messageData);
     }
   };
 
-// Get group details
+  // Get group details
   const fetchGroupDetails = async () => {
     try {
       if (!currentGroup) return;
@@ -509,9 +511,12 @@ socketRef.current.emit("chat-message", messageData);
   const fetchChatMessages = async () => {
     try {
       if (!currentGroup) return;
-      const response = await axios.post(url + "/api/group-order/chat-messages", {
-        groupCode: currentGroup,
-      });
+      const response = await axios.post(
+        url + "/api/group-order/chat-messages",
+        {
+          groupCode: currentGroup,
+        },
+      );
       if (response.data.success && response.data.messages) {
         setChatMessages(response.data.messages);
       }
@@ -657,7 +662,7 @@ socketRef.current.emit("chat-message", messageData);
   const formatChatTime = (timestamp) => {
     if (!timestamp) return "";
     const date = new Date(timestamp);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   };
 
   // Copy share link
@@ -903,7 +908,7 @@ socketRef.current.emit("chat-message", messageData);
             gap: "10px",
           }}
         >
-<input
+          <input
             key="chat-input"
             ref={chatInputRef}
             type="text"
@@ -1117,24 +1122,24 @@ socketRef.current.emit("chat-message", messageData);
         <h1>Group Order: {currentGroup}</h1>
         <div style={{ display: "flex", gap: 8 }}>
           <button
-            className={`copy-btn ${showChat ? 'active' : ''}`}
+            className={`copy-btn ${showChat ? "active" : ""}`}
             onClick={() => setShowChat(!showChat)}
-            style={showChat ? { backgroundColor: '#22c55e' } : {}}
+            style={showChat ? { backgroundColor: "#22c55e" } : {}}
           >
             Chat {chatMessages.length > 0 && `(${chatMessages.length})`}
           </button>
           <button className="copy-btn" onClick={() => setShowQRCode(true)}>
-             QR Code
+            QR Code
           </button>
           <button className="copy-btn" onClick={handleCopyShareLink}>
-             Copy Link
+            Copy Link
           </button>
           <button className="copy-btn" onClick={handleShareWhatsApp}>
-             WhatsApp
+            WhatsApp
           </button>
           {twilioConfigured && (
             <button className="copy-btn" onClick={handleSendSmsServer}>
-               SMS
+              SMS
             </button>
           )}
         </div>
