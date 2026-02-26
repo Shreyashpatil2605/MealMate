@@ -37,7 +37,7 @@ const App = () => {
           <Route path="/verify" element={<Verify />} />
           <Route path="/myorders" element={<MyOrders />} />
           <Route path="/recommendations" element={<Recommendations />} />
-          <Route path="/group-order" element={<GroupOrder />} />
+<Route path="/group-order" element={<GroupOrder setShowLogin={setShowLogin} />} />
         </Routes>
       </div>
       <Footer />

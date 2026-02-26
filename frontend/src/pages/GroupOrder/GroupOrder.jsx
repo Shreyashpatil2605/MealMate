@@ -57,8 +57,37 @@ const calculateTotals = (items) => {
   };
 };
 
-const GroupOrder = () => {
-  const { url, food_list } = useContext(StoreContext);
+const GroupOrder = ({ setShowLogin }) => {
+  const { url, food_list, token } = useContext(StoreContext);
+
+  // Authentication check - redirect to login if not authenticated
+  if (!token) {
+    return (
+      <div className="group-order-container" style={{ textAlign: "center", padding: "60px 20px" }}>
+        <h1 className="group-order-title">👥 Group Ordering</h1>
+        <div style={{ 
+          background: "rgba(50,50,50,0.6)", 
+          borderRadius: "16px", 
+          padding: "40px", 
+          maxWidth: "400px", 
+          margin: "40px auto",
+          border: "1px solid rgba(34,197,94,0.2)"
+        }}>
+          <h2 style={{ color: "#fff", marginBottom: "16px" }}>Authentication Required</h2>
+          <p style={{ color: "#999", marginBottom: "24px" }}>
+            You need to be logged in to create or join group orders.
+          </p>
+          <button 
+            onClick={() => setShowLogin(true)}
+            className="group-btn primary"
+            style={{ padding: "14px 32px", fontSize: "16px" }}
+          >
+            Sign Up / Login
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Memoized helper function to get full image URL
   const getImageUrl = useCallback(
