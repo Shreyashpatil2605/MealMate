@@ -105,7 +105,7 @@ const updateStatus = async (req, res) => {
         status: req.body.status,
       });
       res.json({ success: true, message: "Status Updated Successfully" });
-    }else{
+    } else {
       res.json({ success: false, message: "You are not an admin" });
     }
   } catch (error) {

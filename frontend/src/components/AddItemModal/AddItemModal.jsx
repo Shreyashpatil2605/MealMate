@@ -81,7 +81,7 @@ const AddItemModal = ({
           <img src={image} alt={itemName} className="modal-item-image" />
           <div className="modal-item-info">
             <h2>{itemName}</h2>
-            <p className="modal-price">${price}</p>
+            <p className="modal-price">₹{price}</p>
           </div>
         </div>
 
