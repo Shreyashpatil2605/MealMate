@@ -5,10 +5,12 @@ const userSchema = new mongoose.Schema(
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
-    role: { type: String, default:"user" },
+    role: { type: String, default: "user" },
     cartData: { type: Object, default: {} },
+    photoURL: { type: String, default: "" },
+    isGoogleUser: { type: Boolean, default: false },
   },
-  { minimize: false }
+  { minimize: false },
 );
 
 const userModel = mongoose.model.user || mongoose.model("user", userSchema);

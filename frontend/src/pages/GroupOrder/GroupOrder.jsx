@@ -768,22 +768,20 @@ const GroupOrder = ({ setShowLogin }) => {
 
   const handleFinalizeSingle = async () => {
     try {
-      const payerName = window.prompt(
-        "Enter the name of the person who will pay (case-sensitive):",
-      );
-      if (!payerName) return;
+      // Use the current logged-in user as the payer
+      const currentUserId = getUserId();
       const payer = (groupDetails.members || []).find(
-        (m) => m.userName === payerName,
+        (m) => m.userId === currentUserId,
       );
       if (!payer) {
-        toast.error("Payer not found among members");
+        toast.error("You are not a member of this group");
         return;
       }
       setLoading(true);
       const response = await axios.post(url + "/api/group-order/finalize", {
         groupCode: currentGroup,
         paymentOption: "single_payer",
-        payerId: payer.userId,
+        payerId: currentUserId,
         frontendUrl: window.location.origin,
       });
       if (response.data.success) {
@@ -1760,7 +1758,7 @@ const GroupOrder = ({ setShowLogin }) => {
             className="action-btn secondary"
             onClick={handleFinalizeSingle}
           >
-            Finalize (One Pays All)
+Finalize (Pay by Me)
           </button>
           <button
             className="action-btn secondary"

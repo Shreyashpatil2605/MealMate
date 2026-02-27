@@ -28,14 +28,10 @@ const RecommendationsWidget = () => {
   useEffect(() => {
     const fetchRecommendations = async () => {
       try {
-        console.log("Widget fetching recommendations with location:", location);
         const response = await axios.post(url + "/api/recommendation/get", {
           lat: location.lat,
           lon: location.lon,
         });
-
-        console.log("Widget recommendations response:", response.data);
-
         if (response.data.success) {
           setRecommendations(response.data.data);
         }
