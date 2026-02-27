@@ -75,4 +75,45 @@ const registerUser = async (req, res) => {
   }
 };
 
-export { loginUser, registerUser };
+// Google Login - handle users signing in with Google
+const googleLogin = async (req, res) => {
+  try {
+    const { idToken, name, email, photoURL } = req.body;
+
+    if (!idToken || !email) {
+      return res.json({ success: false, message: "Invalid request" });
+    }
+
+    // Check if user already exists
+    let user = await userModel.findOne({ email });
+
+    if (!user) {
+      // Create new user with Google info
+      user = new userModel({
+        name: name || email.split("@")[0],
+        email: email,
+        password: "google-oauth", // Placeholder for Google users
+        photoURL: photoURL || "",
+        isGoogleUser: true,
+      });
+
+      await user.save();
+    }
+
+    // Generate JWT token
+    const token = createToken(user._id);
+    const role = user.role;
+
+    res.json({
+      success: true,
+      token,
+      role,
+      name: user.name,
+    });
+  } catch (error) {
+    console.error("Google login error:", error);
+    res.json({ success: false, message: "Error logging in with Google" });
+  }
+};
+
+export { loginUser, registerUser, googleLogin };

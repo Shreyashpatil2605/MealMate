@@ -391,7 +391,7 @@ const getGroupOrderDetails = async (req, res) => {
         const price = Number(item.price) || 0;
         const quantity = Number(item.quantity) || 0;
         const itemTotal = price * quantity;
-        
+
         grandTotal += itemTotal;
 
         if (!splitByUser[item.userId]) {
@@ -716,11 +716,12 @@ const shareGroupLinkSms = async (req, res) => {
 
     // Validate phone number format
     const phoneRegex = /^\+?[1-9]\d{1,14}$/;
-    const cleanPhone = phoneNumber.replace(/[\s\-\(\)]/g, '');
+    const cleanPhone = phoneNumber.replace(/[\s\-\(\)]/g, "");
     if (!phoneRegex.test(cleanPhone)) {
       return res.json({
         success: false,
-        message: "Invalid phone number format. Please use E.164 format (e.g., +1234567890)",
+        message:
+          "Invalid phone number format. Please use E.164 format (e.g., +1234567890)",
       });
     }
 
@@ -733,11 +734,13 @@ const shareGroupLinkSms = async (req, res) => {
     if (!client) {
       return res.json({
         success: false,
-        message: "SMS service is not configured. Please contact the administrator.",
+        message:
+          "SMS service is not configured. Please contact the administrator.",
       });
     }
 
-    const frontend = frontendUrl || process.env.FRONTEND_URL || "http://localhost:5173";
+    const frontend =
+      frontendUrl || process.env.FRONTEND_URL || "http://localhost:5173";
     const link = `${frontend}/group-order?code=${groupCode}`;
     const body = `You're invited to join a group order (${groupCode}). Join here: ${link}`;
 
@@ -745,7 +748,8 @@ const shareGroupLinkSms = async (req, res) => {
     if (!fromNumber) {
       return res.json({
         success: false,
-        message: "SMS sender number not configured. Please contact the administrator.",
+        message:
+          "SMS sender number not configured. Please contact the administrator.",
       });
     }
 
@@ -762,58 +766,64 @@ const shareGroupLinkSms = async (req, res) => {
     });
   } catch (error) {
     console.error("Error sending SMS:", error);
-    
+
     if (error.code) {
       switch (error.code) {
         case 20003:
-          return res.json({ 
-            success: false, 
-            message: "Twilio authentication failed. Please contact the administrator." 
+          return res.json({
+            success: false,
+            message:
+              "Twilio authentication failed. Please contact the administrator.",
           });
         case 20404:
-          return res.json({ 
-            success: false, 
-            message: "Invalid sender number. Please contact the administrator." 
+          return res.json({
+            success: false,
+            message: "Invalid sender number. Please contact the administrator.",
           });
         case 21211:
         case 21601:
         case 21614:
-          return res.json({ 
-            success: false, 
-            message: "Invalid phone number. Please check and try again." 
+          return res.json({
+            success: false,
+            message: "Invalid phone number. Please check and try again.",
           });
         case 29999:
-          return res.json({ 
-            success: false, 
-            message: "Twilio account issue. Please contact the administrator." 
+          return res.json({
+            success: false,
+            message: "Twilio account issue. Please contact the administrator.",
           });
         default:
-          if (error.message && error.message.includes("not a valid phone number")) {
-            return res.json({ 
-              success: false, 
-              message: "Invalid phone number. Please check and try again." 
+          if (
+            error.message &&
+            error.message.includes("not a valid phone number")
+          ) {
+            return res.json({
+              success: false,
+              message: "Invalid phone number. Please check and try again.",
             });
           }
       }
     }
-    
+
     if (error.message && error.message.includes("ENOTFOUND")) {
-      return res.json({ 
-        success: false, 
-        message: "Unable to connect to SMS service. Please check your internet connection." 
+      return res.json({
+        success: false,
+        message:
+          "Unable to connect to SMS service. Please check your internet connection.",
       });
     }
-    
+
     if (error.message && error.message.includes("ETIMEDOUT")) {
-      return res.json({ 
-        success: false, 
-        message: "SMS service request timed out. Please try again." 
+      return res.json({
+        success: false,
+        message: "SMS service request timed out. Please try again.",
       });
     }
-    
-    return res.json({ 
-      success: false, 
-      message: "Failed to send SMS. Please try again later or use an alternative method to share the link." 
+
+    return res.json({
+      success: false,
+      message:
+        "Failed to send SMS. Please try again later or use an alternative method to share the link.",
     });
   }
 };
@@ -823,9 +833,9 @@ const checkTwilioConfig = async (req, res) => {
   const sid = process.env.TWILIO_ACCOUNT_SID;
   const token = process.env.TWILIO_AUTH_TOKEN;
   const phoneNumber = process.env.TWILIO_PHONE_NUMBER;
-  
+
   const isConfigured = !!(sid && token && phoneNumber);
-  
+
   return res.json({
     success: true,
     configured: isConfigured,
@@ -860,7 +870,6 @@ const saveChatMessage = async (groupCode, userId, userName, message) => {
   }
 };
 
-// Get chat messages for a group
 const getChatMessages = async (req, res) => {
   try {
     const { groupCode } = req.body;

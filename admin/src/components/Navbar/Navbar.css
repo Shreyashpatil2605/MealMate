@@ -7,7 +7,7 @@
     135deg,
     rgba(255, 107, 53, 0.95) 0%,
     rgba(240, 84, 42, 0.95) 100%
-  );
+  );    backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   box-shadow: 0 8px 32px rgba(255, 107, 53, 0.15);
   top: 0;

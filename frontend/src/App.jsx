@@ -13,6 +13,7 @@ import Verify from "./pages/Verify/Verify";
 import MyOrders from "./pages/MyOrders/MyOrders";
 import Recommendations from "./pages/Recommendations/Recommendations";
 import GroupOrder from "./pages/GroupOrder/GroupOrder";
+import Search from "./pages/Search/Search";
 import { StoreContext } from "./context/StoreContext";
 
 const App = () => {
@@ -37,7 +38,8 @@ const App = () => {
           <Route path="/verify" element={<Verify />} />
           <Route path="/myorders" element={<MyOrders />} />
           <Route path="/recommendations" element={<Recommendations />} />
-<Route path="/group-order" element={<GroupOrder setShowLogin={setShowLogin} />} />
+          <Route path="/group-order" element={<GroupOrder setShowLogin={setShowLogin} />} />
+          <Route path="/search" element={<Search />} />
         </Routes>
       </div>
       <Footer />
