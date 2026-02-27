@@ -27,6 +27,7 @@ const seedAdmin = async () => {
       email: "admin@food.com",
       password: hashedPassword,
       role: "admin",
+      isEmailVerified: true, // Admin account is pre-verified
       cartData: {},
     });
 

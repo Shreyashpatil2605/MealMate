@@ -14,38 +14,18 @@ const StoreContextProvider = (props) => {
         setToken(localStorage.getItem("token"));
       }
       if (localStorage.getItem("admin")) {
-        setAdmin(localStorage.getItem("admin"));
-      } else {
-        // Auto-login with default admin credentials
-        await autoLogin();
+        setAdmin(JSON.parse(localStorage.getItem("admin")));
       }
     }
     loadData();
   }, []);
-
-  const autoLogin = async () => {
-    try {
-      const response = await axios.post(`${apiUrl}/api/user/login`, {
-        email: "admin@food.com",
-        password: "admin123",
-      });
-
-      if (response.data.success) {
-        setToken(response.data.token);
-        setAdmin(true);
-        localStorage.setItem("token", response.data.token);
-        localStorage.setItem("admin", true);
-      }
-    } catch (error) {
-      console.log("Auto-login failed:", error);
-    }
-  };
 
   const contextValue = {
     token,
     setToken,
     admin,
     setAdmin,
+    apiUrl,
   };
   return (
     <StoreContext.Provider value={contextValue}>
