@@ -2,10 +2,12 @@ import React, { useContext, useEffect, useState } from "react";
 import "./Recommendations.css";
 import { StoreContext } from "../../context/StoreContext";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
 import { assets } from "../../assets/frontend_assets/assets";
 
 const Recommendations = () => {
   const { url, token } = useContext(StoreContext);
+  const navigate = useNavigate();
   const [recommendations, setRecommendations] = useState(null);
   const [loading, setLoading] = useState(true);
   const [location, setLocation] = useState({ lat: 24.8607, lon: 67.0011 }); // Default: Karachi
@@ -109,14 +111,26 @@ const Recommendations = () => {
         {recommendations.recommendations.map((food, index) => (
           <div key={index} className="recommendation-card">
             <div className="recommendation-header">
-              <h3>{food}</h3>
+              <h3
+                onClick={() =>
+                  navigate(`/search?q=${encodeURIComponent(food)}`)
+                }
+                style={{ cursor: "pointer" }}
+              >
+                {food}
+              </h3>
               <span className="recommendation-rank">#{index + 1}</span>
             </div>
             <p className="recommendation-reason">
               Perfect for {recommendations.timeOfDay} during{" "}
               {recommendations.weatherCondition} weather
             </p>
-            <button className="recommendation-btn">Add to Cart</button>
+            <button
+              className="recommendation-btn"
+              onClick={() => navigate(`/search?q=${encodeURIComponent(food)}`)}
+            >
+              View in Search
+            </button>
           </div>
         ))}
       </div>

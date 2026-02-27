@@ -14,26 +14,36 @@ const Search = () => {
     setSearchQuery(query);
   }, [query]);
 
-  // Filter food items based on search query
+  // Filter food items - show exact match only if query matches exactly
   const filteredFood = searchQuery
     ? food_list?.filter(
         (item) =>
+          item.name.toLowerCase() === searchQuery.toLowerCase() ||
           item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           item.category?.toLowerCase().includes(searchQuery.toLowerCase()) ||
           item.description?.toLowerCase().includes(searchQuery.toLowerCase())
       )
     : [];
 
+  // Check if there's an exact match - if so, show only that item
+  const exactMatch = filteredFood?.find(
+    (item) => item.name.toLowerCase() === searchQuery.toLowerCase()
+  );
+
+  // Display only exact match if found, otherwise show all filtered results
+  const displayItems = exactMatch ? [exactMatch] : filteredFood;
+
   return (
     <div className="search-page">
       <div className="search-header">
         <h1>Search Results</h1>
         <p>
-          {filteredFood?.length || 0} results found for "{searchQuery}"
+          {displayItems?.length || 0} results found for "{searchQuery}"
+          {exactMatch && <span> (Showing exact match)</span>}
         </p>
       </div>
-      {filteredFood && filteredFood.length > 0 ? (
-        <FoodDisplay category="All" searchResults={filteredFood} />
+      {displayItems && displayItems.length > 0 ? (
+        <FoodDisplay category="All" searchResults={displayItems} />
       ) : (
         <div className="no-results">
           <h2>No results found</h2>

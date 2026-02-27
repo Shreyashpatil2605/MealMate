@@ -1,10 +1,6 @@
-# TODO - Remove Group Order History Feature
+# TODO - Click suggestion to search
 
-## Status: COMPLETED
-
-All group order history features have been removed:
-
-1. **Navbar.jsx** - "Your Group Orders History" link already removed
-2. **Footer.jsx** - "Previous Group Orders" link already removed
-3. **groupOrderRoute.js** - getUserGroupOrders route already removed
-4. **groupOrderController.js** - getUserGroupOrders function already removed
+- [x] Analyze codebase to understand current implementation
+- [x] Update Recommendations.jsx - Make food names clickable to navigate to search
+- [x] Update Search.jsx - Show only exact match item
+- [x] Test the implementation

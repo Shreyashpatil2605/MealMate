@@ -39,17 +39,10 @@ const Navbar = ({ setShowLogin }) => {
     }
   };
 
-  const handleFoodClick = (itemId) => {
+  const handleFoodClick = (item) => {
     setSearchOpen(false);
     setSearchQuery("");
-    navigate("/");
-    // Scroll to food display after a small delay
-    setTimeout(() => {
-      const element = document.getElementById("food-display");
-      if (element) {
-        element.scrollIntoView({ behavior: "smooth" });
-      }
-    }, 100);
+    navigate(`/search?q=${encodeURIComponent(item.name)}`);
   };
 
   // add/remove class on body so parent .app can adjust
@@ -205,7 +198,7 @@ const Navbar = ({ setShowLogin }) => {
                   {filteredFood.map((item) => (
                     <div
                       key={item._id}
-                      onClick={() => handleFoodClick(item._id)}
+                      onClick={() => handleFoodClick(item)}
                       style={{
                         padding: "8px",
                         cursor: "pointer",
