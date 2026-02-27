@@ -512,7 +512,7 @@ const finalizeGroupOrder = async (req, res) => {
       if (frontendUrl && process.env.STRIPE_SECRET_KEY) {
         const line_items = combinedItems.map((item) => ({
           price_data: {
-            currency: "usd",
+            currency: "inr",
             product_data: { name: item.name },
             unit_amount: Math.round(item.price * 100),
           },
@@ -520,7 +520,7 @@ const finalizeGroupOrder = async (req, res) => {
         }));
         line_items.push({
           price_data: {
-            currency: "usd",
+            currency: "inr",
             product_data: { name: "Delivery Charges" },
             unit_amount: 200,
           },
@@ -584,7 +584,7 @@ const finalizeGroupOrder = async (req, res) => {
       if (frontendUrl && process.env.STRIPE_SECRET_KEY) {
         const line_items = itemsForUser.map((item) => ({
           price_data: {
-            currency: "usd",
+            currency: "inr",
             product_data: { name: item.name },
             unit_amount: Math.round(item.price * 100),
           },
@@ -592,7 +592,7 @@ const finalizeGroupOrder = async (req, res) => {
         }));
         line_items.push({
           price_data: {
-            currency: "usd",
+            currency: "inr",
             product_data: { name: "Delivery Charges" },
             unit_amount: 200,
           },

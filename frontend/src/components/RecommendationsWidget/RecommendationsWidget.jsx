@@ -73,7 +73,7 @@ const RecommendationsWidget = () => {
             <div className="item-info">
               <h4>{item.name}</h4>
               <p className="item-category">{item.category}</p>
-              <p className="item-price">${item.price}</p>
+              <p className="item-price">₹{item.price}</p>
             </div>
             <button
               className="widget-add-btn"

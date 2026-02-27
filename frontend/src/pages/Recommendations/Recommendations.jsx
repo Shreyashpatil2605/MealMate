@@ -16,11 +16,11 @@ const Recommendations = () => {
 
   // Dietary preference options
   const dietaryOptions = [
-    { id: "vegetarian", label: "Vegetarian",  },
-    { id: "vegan", label: "Vegan",  },
+    { id: "vegetarian", label: "Vegetarian" },
+    { id: "vegan", label: "Vegan" },
     { id: "gluten-free", label: " Gluten-Free" },
     { id: "dairy-free", label: " Dairy-Free" },
-    { id: "nut-free", label: " Nut-Free"},
+    { id: "nut-free", label: " Nut-Free" },
     { id: "halal", label: " Halal" },
     { id: "kosher", label: " Kosher" },
   ];
@@ -219,7 +219,7 @@ const Recommendations = () => {
                 >
                   {item.name}
                 </h4>
-                {item.price && <p className="food-price">${item.price}</p>}
+                {item.price && <p className="food-price">₹{item.price}</p>}
                 {item.rating > 0 && (
                   <span className="rating-badge">
                     ⭐ {item.rating.toFixed(1)}
@@ -332,7 +332,7 @@ const Recommendations = () => {
                   >
                     {foodName}
                   </h3>
-                  {foodPrice && <p className="food-price">${foodPrice}</p>}
+                  {foodPrice && <p className="food-price">₹{foodPrice}</p>}
 
                   {/* Explainable reasons */}
                   <div className="recommendation-reasons">
