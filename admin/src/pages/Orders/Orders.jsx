@@ -7,11 +7,9 @@ import { useEffect } from "react";
 import { assets } from "../../assets/assets";
 import { useContext } from "react";
 import { StoreContext } from "../../context/StoreContext";
-import { useNavigate } from "react-router-dom";
 
 const Orders = ({ url }) => {
-  const navigate = useNavigate();
-  const { token, admin } = useContext(StoreContext);
+  const { token } = useContext(StoreContext);
   const [orders, setOrders] = useState([]);
 
   const fetchAllOrder = async () => {
@@ -51,10 +49,6 @@ const Orders = ({ url }) => {
     }
   };
   useEffect(() => {
-    if (!admin && !token) {
-      toast.error("Please Login First");
-      navigate("/");
-    }
     fetchAllOrder();
   }, []);
 
