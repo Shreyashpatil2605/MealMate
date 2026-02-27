@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import { createServer } from "http";
@@ -5,7 +6,6 @@ import { Server } from "socket.io";
 import { connectDB } from "./config/db.js";
 import foodRouter from "./routes/foodRoute.js";
 import userRouter from "./routes/userRoute.js";
-import "dotenv/config";
 import cartRouter from "./routes/cartRoute.js";
 import orderRouter from "./routes/orderRoute.js";
 import recommendationRoute from "./routes/recommendationRoute.js";
@@ -21,33 +21,33 @@ const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
     origin: "*",
-    methods: ["GET", "POST"]
-  }
+    methods: ["GET", "POST"],
+  },
 });
 
 // Store io instance for use in controllers
-app.set('io', io);
+app.set("io", io);
 
 // Socket.IO connection handling
-io.on('connection', (socket) => {
-  console.log('Client connected:', socket.id);
+io.on("connection", (socket) => {
+  console.log("Client connected:", socket.id);
 
   // Join a group room
-  socket.on('join-group', (groupCode) => {
+  socket.on("join-group", (groupCode) => {
     socket.join(groupCode);
     console.log(`Socket ${socket.id} joined group: ${groupCode}`);
   });
 
   // Leave a group room
-  socket.on('leave-group', (groupCode) => {
+  socket.on("leave-group", (groupCode) => {
     socket.leave(groupCode);
     console.log(`Socket ${socket.id} left group: ${groupCode}`);
   });
 
   // Handle chat messages with MongoDB persistence
-  socket.on('chat-message', async (data) => {
+  socket.on("chat-message", async (data) => {
     const { groupCode, userId, userName, message, timestamp } = data;
-    
+
     // Save message to MongoDB
     try {
       const groupOrder = await groupOrderModel.findOne({ groupCode });
@@ -57,30 +57,32 @@ io.on('connection', (socket) => {
           userId,
           userName,
           message,
-          timestamp: timestamp || new Date()
+          timestamp: timestamp || new Date(),
         });
         await groupOrder.save();
         console.log(`Chat message saved to DB for group ${groupCode}`);
       }
     } catch (error) {
-      console.error('Error saving chat message to DB:', error);
+      console.error("Error saving chat message to DB:", error);
     }
-    
+
     // Broadcast message to all members in the group room
     if (groupCode) {
-      io.to(groupCode).emit('chat-message', {
+      io.to(groupCode).emit("chat-message", {
         groupCode,
         userId,
         userName,
         message,
-        timestamp: timestamp || new Date().toISOString()
+        timestamp: timestamp || new Date().toISOString(),
       });
-      console.log(`Chat message in group ${groupCode} from ${userName}: ${message}`);
+      console.log(
+        `Chat message in group ${groupCode} from ${userName}: ${message}`,
+      );
     }
   });
 
-  socket.on('disconnect', () => {
-    console.log('Client disconnected:', socket.id);
+  socket.on("disconnect", () => {
+    console.log("Client disconnected:", socket.id);
   });
 });
 

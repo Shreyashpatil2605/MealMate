@@ -45,16 +45,16 @@ const Footer = () => {
               <Link to="/app-download">Mobile App</Link>
             </li>
             <li>
-              <a href="mailto:contact@tomato.com">Contact Us</a>
+              <a href="mailto:contact@mealmate.com">Contact Us</a>
             </li>
             <li>+92-308-4900522</li>
-            <li>contact@tomato.com</li>
+            <li>contact@mealmate.com</li>
           </ul>
         </div>
       </div>
       <hr />
       <p className="footer-copyright">
-        Copyright 2024 @ Tomato.com - All Right Reserved.
+        Copyright 2024 @ MealMate.com - All Right Reserved.
       </p>
     </div>
   );

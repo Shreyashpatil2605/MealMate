@@ -66,6 +66,22 @@
   line-height: 1.5;
 }
 
+.order-item-phone {
+  color: #ff6b35;
+  font-weight: 600;
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+
+.order-item-time {
+  color: #4ecdc4;
+  font-weight: 600;
+  font-size: 13px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 107, 53, 0.2);
+}
+
 .order-item select {
   background: linear-gradient(
     135deg,

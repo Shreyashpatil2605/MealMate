@@ -9,6 +9,7 @@ const StoreContextProvider = (props) => {
   const url = "http://localhost:4000";
   const [token, setToken] = useState("");
   const [userName, setUserName] = useState("");
+  const [userData, setUserData] = useState(null);
   const [showWelcome, setShowWelcome] = useState(false);
   const [food_list, setFoodList] = useState([]);
 
@@ -132,6 +133,8 @@ const StoreContextProvider = (props) => {
     setToken,
     userName,
     setUserName,
+    userData,
+    setUserData,
     showWelcome,
     setShowWelcome,
   };

@@ -5,12 +5,15 @@ import { StoreContext } from "../../context/StoreContext";
 import axios from "axios";
 import { toast } from "react-toastify";
 import { auth, googleProvider, signInWithPopup } from "../../firebase";
+import OTPVerification from "../OTPVerification/OTPVerification";
 
 const LoginPopup = ({ setShowLogin }) => {
   const { url, setToken, setUserName, setShowWelcome } =
     useContext(StoreContext);
   const [currentState, setCurrentState] = useState("Login");
   const [loading, setLoading] = useState(false);
+  const [showOTPVerification, setShowOTPVerification] = useState(false);
+  const [registrationEmail, setRegistrationEmail] = useState("");
   const [data, setData] = useState({
     name: "",
     email: "",
@@ -31,20 +34,45 @@ const LoginPopup = ({ setShowLogin }) => {
     } else {
       newUrl += "/api/user/register";
     }
-    const response = await axios.post(newUrl, data);
-    if (response.data.success) {
-      setToken(response.data.token);
-      localStorage.setItem("token", response.data.token);
-      const name =
-        response.data.name || (currentState === "Sign Up" ? data.name : "User");
-      setUserName(name);
-      setShowWelcome(true);
-      // Use setTimeout to allow the WelcomePopup to render before closing the LoginPopup
-      setTimeout(() => {
-        setShowLogin(false);
-      }, 100);
-    } else {
-      toast.error(response.data.message);
+
+    setLoading(true);
+    try {
+      const response = await axios.post(newUrl, data);
+
+      if (response.data.success) {
+        if (
+          currentState === "Sign Up" &&
+          response.data.requiresOTPVerification
+        ) {
+          // Show OTP verification screen
+          setRegistrationEmail(data.email);
+          setShowOTPVerification(true);
+          toast.success("Account created! Please verify your email.");
+        } else {
+          // Direct login (for Login state or no OTP requirement)
+          setToken(response.data.token);
+          localStorage.setItem("token", response.data.token);
+          const name =
+            response.data.name ||
+            (currentState === "Sign Up" ? data.name : "User");
+          setUserName(name);
+          setShowWelcome(true);
+          setTimeout(() => {
+            setShowLogin(false);
+          }, 100);
+        }
+      } else {
+        if (response.data.requiresVerification) {
+          toast.error("Please verify your email before logging in");
+        } else {
+          toast.error(response.data.message);
+        }
+      }
+    } catch (error) {
+      console.error("Login/Register error:", error);
+      toast.error("An error occurred. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -89,6 +117,32 @@ const LoginPopup = ({ setShowLogin }) => {
       setLoading(false);
     }
   };
+
+  const handleOTPVerificationSuccess = () => {
+    setShowOTPVerification(false);
+    setShowLogin(false);
+  };
+
+  const handleBackFromOTP = () => {
+    setShowOTPVerification(false);
+    // Reset form for re-registration
+    setData({
+      name: "",
+      email: "",
+      password: "",
+    });
+  };
+
+  if (showOTPVerification) {
+    return (
+      <OTPVerification
+        email={registrationEmail}
+        onVerificationSuccess={handleOTPVerificationSuccess}
+        onBackClick={handleBackFromOTP}
+      />
+    );
+  }
+
   return (
     <div className="login-popup">
       <form onSubmit={onLogin} className="login-popup-container">
@@ -130,8 +184,12 @@ const LoginPopup = ({ setShowLogin }) => {
             required
           />
         </div>
-        <button type="submit">
-          {currentState === "Sign Up" ? "Create Account" : "Login"}
+        <button type="submit" disabled={loading}>
+          {loading
+            ? "Processing..."
+            : currentState === "Sign Up"
+              ? "Create Account"
+              : "Login"}
         </button>
         {currentState === "Login" && (
           <button

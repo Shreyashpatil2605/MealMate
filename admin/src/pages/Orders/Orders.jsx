@@ -19,7 +19,18 @@ const Orders = ({ url }) => {
       headers: { token },
     });
     if (response.data.success) {
-      setOrders(response.data.data);
+      // Sort orders by creation date - newest first (most recent at top)
+      const sortedOrders = response.data.data.sort((a, b) => {
+        // Try to sort by createdAt if available, otherwise use _id timestamp
+        const dateA = a.createdAt
+          ? new Date(a.createdAt)
+          : new Date(parseInt(a._id.substring(0, 8), 16) * 1000);
+        const dateB = b.createdAt
+          ? new Date(b.createdAt)
+          : new Date(parseInt(b._id.substring(0, 8), 16) * 1000);
+        return dateB - dateA; // Descending order (newest first)
+      });
+      setOrders(sortedOrders);
     }
   };
 
@@ -30,7 +41,7 @@ const Orders = ({ url }) => {
         orderId,
         status: event.target.value,
       },
-      { headers: { token } }
+      { headers: { token } },
     );
     if (response.data.success) {
       toast.success(response.data.message);
@@ -56,7 +67,7 @@ const Orders = ({ url }) => {
             <img src={assets.parcel_icon} alt="" />
             <div>
               <p className="order-item-food">
-                {order.items.map((item, index) => {
+                {order.items?.map((item, index) => {
                   if (index === order.items.length - 1) {
                     return item.name + " x " + item.quantity;
                   } else {
@@ -65,24 +76,34 @@ const Orders = ({ url }) => {
                 })}
               </p>
               <p className="order-item-name">
-                {order.address.firstName + " " + order.address.lastName}
+                {order.address
+                  ? `${order.address.firstName || ""} ${order.address.lastName || ""}`
+                  : "No address provided"}
               </p>
               <div className="order-item-address">
-                <p>{order.address.street + ","}</p>
-                <p>
-                  {order.address.city +
-                    ", " +
-                    order.address.state +
-                    ", " +
-                    order.address.country +
-                    ", " +
-                    order.address.zipcode}
-                </p>
+                {order.address ? (
+                  <>
+                    <p>{(order.address.street || "") + ","}</p>
+                    <p>
+                      {`${order.address.city || ""}, ${order.address.state || ""}, ${order.address.country || ""}, ${order.address.zipcode || ""}`}
+                    </p>
+                  </>
+                ) : (
+                  <p>Address not available</p>
+                )}
               </div>
-              <p className="order-item-phone">{order.address.phone}</p>
+              <p className="order-item-phone">
+                {order.address?.phone || "N/A"}
+              </p>
+              <p className="order-item-time">
+                📅{" "}
+                {order.createdAt
+                  ? new Date(order.createdAt).toLocaleString()
+                  : "Time not available"}
+              </p>
             </div>
-            <p>Items: {order.items.length}</p>
-            <p>${order.amount}</p>
+            <p>Items: {order.items?.length || 0}</p>
+            <p>${order.amount || 0}</p>
             <select
               onChange={(event) => statusHandler(event, order._id)}
               value={order.status}

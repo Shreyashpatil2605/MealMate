@@ -1,28 +1,23 @@
 import axios from "axios";
 import orderModel from "../models/orderModel.js";
+import foodModel from "../models/foodModel.js";
+import userModel from "../models/userModel.js";
 
 const OPENWEATHER_API_KEY =
-  process.env.OPENWEATHER_API_KEY || "0d5fb5b93d4af21c66a2948710284366"; // Free tier key
+  process.env.OPENWEATHER_API_KEY || "0d5fb5b93d4af21c66a2948710284366";
 const WEATHER_API_URL = "https://api.openweathermap.org/data/2.5/weather";
+
+// ==================== HELPER FUNCTIONS ====================
 
 // Get current weather
 const getWeather = async (lat = 24.8607, lon = 67.0011) => {
   try {
     const response = await axios.get(WEATHER_API_URL, {
-      params: {
-        lat,
-        lon,
-        appid: OPENWEATHER_API_KEY,
-        units: "metric",
-      },
+      params: { lat, lon, appid: OPENWEATHER_API_KEY, units: "metric" },
     });
     return response.data;
   } catch (error) {
-    console.warn(
-      "Weather API not available, using default weather conditions:",
-      error.message,
-    );
-    // Return a default sunny weather object for fallback
+    console.warn("Weather API not available, using default:", error.message);
     return {
       main: { temp: 25 },
       weather: [{ main: "Clear", description: "clear sky" }],
@@ -42,13 +37,13 @@ const getTimeOfDay = () => {
 
 // Get weather condition
 const getWeatherCondition = (weatherData) => {
-  if (!weatherData) return "sunny"; // Default to sunny if no weather data
+  if (!weatherData) return "sunny";
   const main = weatherData.weather[0]?.main?.toLowerCase() || "sunny";
   if (main.includes("rain")) return "rainy";
   if (main.includes("cloud")) return "cloudy";
   if (main.includes("clear") || main.includes("sunny")) return "sunny";
   if (main.includes("snow")) return "snowy";
-  return "sunny"; // Default fallback
+  return "sunny";
 };
 
 // Get temperature level
@@ -60,7 +55,7 @@ const getTempLevel = (weatherData) => {
   return "moderate";
 };
 
-// Food recommendation database
+// Food recommendation database (fallback)
 const recommendationRules = {
   breakfast: {
     sunny: ["Omelette", "Pancakes", "Fruit Salad", "Yogurt", "Toast"],
@@ -94,32 +89,7 @@ const recommendationRules = {
   },
 };
 
-// Modify recommendations based on temperature
-const applyTemperatureModifier = (recommendations, tempLevel) => {
-  if (tempLevel === "hot") {
-    const coolFoods = [
-      "Ice Cream",
-      "Fresh Juice",
-      "Smoothie",
-      "Salad",
-      "Frozen Yogurt",
-    ];
-    return [...coolFoods, ...recommendations].slice(0, 5);
-  }
-  if (tempLevel === "cold") {
-    const hotFoods = [
-      "Hot Tea",
-      "Hot Chocolate",
-      "Soup",
-      "Hot Coffee",
-      "Curry",
-    ];
-    return [...hotFoods, ...recommendations].slice(0, 5);
-  }
-  return recommendations;
-};
-
-// Get user's food history
+// Get user's food history with order counts
 const getUserFoodHistory = async (userId) => {
   try {
     const orders = await orderModel.find({ userId }).select("items");
@@ -129,84 +99,506 @@ const getUserFoodHistory = async (userId) => {
         foodHistory[item.name] = (foodHistory[item.name] || 0) + 1;
       });
     });
-    return Object.keys(foodHistory)
-      .sort((a, b) => foodHistory[b] - foodHistory[a])
-      .slice(0, 3);
+    // Return array of {name, count} sorted by count
+    return Object.entries(foodHistory)
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, count]) => ({ name, count }));
   } catch (error) {
     console.error("Error fetching user history:", error);
     return [];
   }
 };
 
-// Main recommendation function
+// Get recently viewed food items
+const getRecentlyViewedItems = async (recentlyViewedIds) => {
+  try {
+    if (!recentlyViewedIds || recentlyViewedIds.length === 0) {
+      return [];
+    }
+
+    // Fetch food details for recently viewed IDs
+    const foods = await foodModel
+      .find({
+        _id: { $in: recentlyViewedIds },
+      })
+      .lean();
+
+    // Maintain the order of recently viewed (most recent first)
+    const foodMap = new Map(foods.map((food) => [food._id.toString(), food]));
+    return recentlyViewedIds
+      .map((id) => foodMap.get(id.toString()))
+      .filter(Boolean)
+      .slice(0, 10); // Limit to 10 items
+  } catch (error) {
+    console.error("Error fetching recently viewed:", error);
+    return [];
+  }
+};
+
+// ==================== SCORING ALGORITHM ====================
+
+const calculateRecommendationScore = (food, context, userData) => {
+  let score = 0;
+  const reasons = [];
+  const scoreDetails = {}; // Track individual components
+
+  // Detect cold-start: no order history AND no dietary preferences
+  const isNewUser =
+    !userData ||
+    ((!userData.orderHistory || userData.orderHistory.length === 0) &&
+      (!userData.dietaryPreferences ||
+        userData.dietaryPreferences.length === 0));
+
+  // Weights configuration
+  const weights = {
+    timeOfDay: 0.2,
+    weather: 0.2,
+    dietary: 0.2,
+    history: 0.2,
+    recent: 0.1,
+    popularity: 0.2,
+  };
+
+  // For cold-start users, rely only on context and popularity
+  const effectiveWeights = isNewUser
+    ? {
+        timeOfDay: 0.25,
+        weather: 0.25,
+        popularity: 0.5,
+        dietary: 0,
+        history: 0,
+        recent: 0,
+      }
+    : weights;
+
+  // ==================== 5. TIME OF DAY SCORING ====================
+  // Increase score if the item matches breakfast, lunch, dinner, or snack time
+  scoreDetails.timeOfDay = 0;
+  if (food.mealType && food.mealType.length > 0) {
+    if (food.mealType.includes(context.timeOfDay)) {
+      // Perfect match for current time
+      scoreDetails.timeOfDay = effectiveWeights.timeOfDay;
+      score += effectiveWeights.timeOfDay;
+      reasons.push(`Perfect for ${context.timeOfDay}`);
+    } else {
+      // Partial credit for being a meal-type food (even if not perfect timing)
+      const partialTimeScore = effectiveWeights.timeOfDay * 0.3;
+      scoreDetails.timeOfDay = partialTimeScore;
+      score += partialTimeScore;
+    }
+  }
+
+  // ==================== 6. WEATHER SCORING ====================
+  // Increase score if the item suits the current weather
+  scoreDetails.weather = 0;
+  if (food.weatherSuitability && food.weatherSuitability.length > 0) {
+    if (food.weatherSuitability.includes(context.weatherCondition)) {
+      // Perfect match for current weather
+      scoreDetails.weather = effectiveWeights.weather;
+      score += effectiveWeights.weather;
+      reasons.push(`Great for ${context.weatherCondition} weather`);
+    } else {
+      // Partial credit for having weather data
+      const partialWeatherScore = effectiveWeights.weather * 0.2;
+      scoreDetails.weather = partialWeatherScore;
+      score += partialWeatherScore;
+    }
+  }
+
+  // ==================== 7. DIETARY & CUISINE PREFERENCES SCORING ====================
+  // Increase score based on user dietary and cuisine preferences
+  scoreDetails.dietary = 0;
+  let dietaryMatchCount = 0;
+  if (
+    userData?.dietaryPreferences?.length > 0 &&
+    food.dietaryTags?.length > 0
+  ) {
+    const matchingPrefs = userData.dietaryPreferences.filter((pref) =>
+      food.dietaryTags.includes(pref),
+    );
+    if (matchingPrefs.length > 0) {
+      // Score based on number of matching dietary preferences
+      const dietaryBoost =
+        (matchingPrefs.length / userData.dietaryPreferences.length) *
+        effectiveWeights.dietary;
+      scoreDetails.dietary = dietaryBoost;
+      score += dietaryBoost;
+      dietaryMatchCount = matchingPrefs.length;
+      reasons.push(`Matches your ${matchingPrefs.join(", ")} preferences`);
+    }
+  }
+
+  // Add cuisine preference boost if available
+  if (userData?.cuisinePreferences?.length > 0 && food.cuisine) {
+    if (userData.cuisinePreferences.includes(food.cuisine)) {
+      const cuisineBoost = effectiveWeights.dietary * 0.4;
+      scoreDetails.dietary += cuisineBoost;
+      score += cuisineBoost;
+      reasons.push(`Your favorite ${food.cuisine} cuisine`);
+    }
+  }
+
+  // ==================== 8. ORDER HISTORY SCORING ====================
+  // Increase score based on the user's past order history
+  scoreDetails.history = 0;
+  if (userData?.orderHistory?.length > 0) {
+    const historyItem = userData.orderHistory.find(
+      (item) => item.name === food.name,
+    );
+    if (historyItem) {
+      // Score increases with order frequency (normalized to 0-1)
+      const normalizedCount = Math.min(historyItem.count / 5, 1);
+      const historyBoost = effectiveWeights.history * normalizedCount;
+      scoreDetails.history = historyBoost;
+      score += historyBoost;
+
+      const orderWord = historyItem.count > 1 ? "times" : "time";
+      reasons.push(
+        `You've ordered this ${historyItem.count} ${orderWord} before`,
+      );
+    } else {
+      // Partial match: category or cuisine matches past orders
+      let categoryMatches = 0;
+      if (food.category) {
+        const categoriesOrdered = userData.orderHistory
+          .map((item) => item.category)
+          .filter((cat) => cat);
+
+        categoryMatches = categoriesOrdered.filter(
+          (cat) => cat === food.category,
+        ).length;
+
+        if (categoryMatches > 0) {
+          const categoryBoost =
+            effectiveWeights.history *
+            0.2 *
+            Math.min(categoryMatches / userData.orderHistory.length, 0.5);
+          scoreDetails.history = categoryBoost;
+          score += categoryBoost;
+          reasons.push(`Similar to your past ${food.category} orders`);
+        }
+      }
+    }
+  }
+
+  // ==================== 9. RECENTLY VIEWED SCORING ====================
+  // Boost score if the item was recently viewed in the current session
+  scoreDetails.recent = 0;
+  if (userData?.recentlyViewed?.includes(food._id?.toString())) {
+    scoreDetails.recent = effectiveWeights.recent;
+    score += effectiveWeights.recent;
+    reasons.push("Recently viewed by you");
+  }
+
+  // ==================== 10. GLOBAL POPULARITY SCORING ====================
+  // Add score based on global popularity metrics (ratings, order volume, trending status)
+  scoreDetails.popularity = 0;
+  const popularityScore = (food.rating || 0) * 10 + (food.orderCount || 0);
+  const normalizedPopularity = Math.min(popularityScore / 100, 1);
+  scoreDetails.popularity = effectiveWeights.popularity * normalizedPopularity;
+  score += scoreDetails.popularity;
+
+  if (popularityScore > 50) {
+    reasons.push("Trending now");
+  } else if (food.orderCount > 20) {
+    reasons.push("Popular choice");
+  }
+
+  // ==================== 11. NEW USER PRIORITIZATION ====================
+  // If the user is new, prioritize popularity and context signals instead of history
+  if (isNewUser && reasons.length === 0) {
+    reasons.push("Popular in your area");
+  }
+
+  // ==================== 12. FINAL SCORE CALCULATION ====================
+  // Calculate the final score for each item by combining all factors
+  // Ensure score is within reasonable bounds
+  const maxPossibleScore = Object.values(effectiveWeights).reduce(
+    (a, b) => a + b,
+    0,
+  );
+  const normalizedScore = Math.min(score, maxPossibleScore);
+
+  return {
+    score: normalizedScore,
+    reasons,
+    scoreDetails, // For debugging
+  };
+};
+
+// ==================== MAIN RECOMMENDATION FUNCTION ====================
+
 const getRecommendations = async (req, res) => {
   try {
-    const { lat, lon, userId } = req.body;
+    const { lat, lon, userId, limit = 10 } = req.body;
 
-    console.log("Getting recommendations for lat:", lat, "lon:", lon);
+    console.log("\n========== RECOMMENDATION ALGORITHM START ==========");
+    console.log("📍 Location:", { lat, lon });
+    console.log("👤 User ID:", userId);
+    console.log("📊 Limit:", limit);
 
     // Get weather data
     const weatherData = await getWeather(lat, lon);
-    console.log("Weather data:", weatherData ? "received" : "failed");
-
-    // Get time and weather conditions
     const timeOfDay = getTimeOfDay();
     const weatherCondition = getWeatherCondition(weatherData);
     const tempLevel = getTempLevel(weatherData);
 
-    console.log(
-      "Time:",
+    const context = { timeOfDay, weatherCondition, tempLevel };
+
+    console.log("🌤️  Context:", {
       timeOfDay,
-      "Weather:",
       weatherCondition,
-      "Temp level:",
       tempLevel,
-    );
+      temp: weatherData?.main?.temp,
+    });
 
-    // Get base recommendations
-    let recommendations =
-      recommendationRules[timeOfDay][weatherCondition] || [];
+    // Get user data if logged in
+    let userData = null;
+    let orderHistory = [];
+    let recentlyViewed = [];
 
-    if (!recommendations || recommendations.length === 0) {
-      console.warn("No recommendations found, using default");
-      recommendations = recommendations || [
-        "Pizza",
-        "Burger",
-        "Pasta",
-        "Salad",
-      ];
+    if (userId && userId !== "user_id") {
+      try {
+        const user = await userModel.findById(userId);
+        if (user) {
+          console.log("✅ User found:", user.name);
+          orderHistory = await getUserFoodHistory(userId);
+          console.log("📋 Order history items:", orderHistory.length);
+
+          // Fetch recently viewed food items
+          const recentlyViewedIds = user.recentlyViewed || [];
+          recentlyViewed = await getRecentlyViewedItems(recentlyViewedIds);
+          console.log("👀 Recently viewed items:", recentlyViewed.length);
+
+          userData = {
+            dietaryPreferences: user.dietaryPreferences || [],
+            recentlyViewed: recentlyViewedIds.map((id) => id.toString()),
+            orderHistory,
+          };
+          console.log("🍽️  Dietary preferences:", userData.dietaryPreferences);
+        } else {
+          console.log("⚠️  User not found in database");
+        }
+      } catch (err) {
+        console.warn("⚠️  Error fetching user data:", err.message);
+      }
+    } else {
+      console.log("👤 Anonymous or guest user");
     }
 
-    // Apply temperature modifier
-    recommendations = applyTemperatureModifier(recommendations, tempLevel);
+    // Check if new user (cold-start): no order history AND no dietary preferences
+    const isNewUser =
+      !userData ||
+      (orderHistory.length === 0 &&
+        (!userData.dietaryPreferences ||
+          userData.dietaryPreferences.length === 0));
 
-    // Get user history
-    const userHistory = userId ? await getUserFoodHistory(userId) : [];
+    console.log(
+      isNewUser
+        ? "❄️  COLD-START MODE (New user)"
+        : "✨ PERSONALIZED MODE (Known user)",
+    );
+    console.log("=== SCORING WEIGHTS ===");
+    const testWeights = isNewUser
+      ? {
+          timeOfDay: 0.25,
+          weather: 0.25,
+          popularity: 0.5,
+          dietary: 0,
+          history: 0,
+          recent: 0,
+        }
+      : {
+          timeOfDay: 0.2,
+          weather: 0.2,
+          dietary: 0.2,
+          history: 0.2,
+          recent: 0.1,
+          popularity: 0.2,
+        };
+    console.log(JSON.stringify(testWeights, null, 2));
+
+    // Get all foods from database
+    let allFoods = await foodModel.find({}).lean();
+
+    // If no foods in database, use fallback recommendations
+    if (!allFoods || allFoods.length === 0) {
+      const fallbackRecs = recommendationRules[timeOfDay]?.[weatherCondition] ||
+        recommendationRules[timeOfDay]?.sunny || [
+          "Pizza",
+          "Burger",
+          "Pasta",
+          "Salad",
+        ];
+
+      // Format recently viewed items for response (even if empty)
+      const formattedRecentlyViewed = recentlyViewed.map((food) => ({
+        _id: food._id,
+        name: food.name,
+        description: food.description,
+        price: food.price,
+        image: food.image,
+        category: food.category,
+        rating: food.rating || 0,
+      }));
+
+      return res.json({
+        success: true,
+        data: {
+          recommendations: fallbackRecs.slice(0, limit),
+          recentlyViewed: formattedRecentlyViewed,
+          timeOfDay,
+          weatherCondition,
+          temperature: weatherData?.main?.temp || null,
+          weatherData: weatherData?.weather[0] || null,
+          userHistory: [],
+          contextMessage: isNewUser
+            ? `Discover popular foods for ${timeOfDay}`
+            : `Recommended for you based on your preferences`,
+          isNewUser,
+          reasons: fallbackRecs.map((r) =>
+            isNewUser ? "Popular in your area" : "Based on your preferences",
+          ),
+        },
+      });
+    }
+
+    // Initialize all foods with score 0, then calculate scores
+    console.log(`\n📦 Processing ${allFoods.length} food items...`);
+    const scoredFoods = allFoods
+      .map((food) => ({
+        ...food,
+        score: 0, // Initialize recommendation score to zero
+        reasons: [],
+      }))
+      .map((food) => {
+        const { score, reasons, scoreDetails } = calculateRecommendationScore(
+          food,
+          context,
+          userData,
+        );
+        return {
+          ...food,
+          score,
+          reasons,
+          scoreDetails,
+        };
+      });
+
+    // ==================== 13. RANK ALL FOOD ITEMS IN DESCENDING ORDER ====================
+    // Sort by score descending
+    console.log("\n🔄 Ranking all items by score (descending order)...");
+    scoredFoods.sort((a, b) => b.score - a.score);
+
+    // ==================== 14. SELECT TOP N HIGHEST-SCORING ITEMS ====================
+    // Get top N recommendations
+    console.log(
+      `\n🏆 Selecting top ${limit} items from ${scoredFoods.length} total...`,
+    );
+    const topRecommendations = scoredFoods.slice(0, limit);
+
+    // Format response
+    const formattedRecommendations = topRecommendations.map((food) => ({
+      _id: food._id,
+      name: food.name,
+      description: food.description,
+      price: food.price,
+      image: food.image,
+      category: food.category,
+      rating: food.rating || 0,
+      reasons: food.reasons,
+    }));
 
     // Create context message
-    let contextMessage = `${timeOfDay.charAt(0).toUpperCase() + timeOfDay.slice(1)} time`;
+    let contextMessage = isNewUser
+      ? `Discover what's popular for ${timeOfDay}`
+      : `Personalized recommendations for you`;
+
     if (weatherData) {
-      contextMessage += ` • ${weatherCondition.charAt(0).toUpperCase() + weatherCondition.slice(1)}`;
-      if (weatherCondition === "rainy") contextMessage += " ☔";
-      if (weatherCondition === "sunny") contextMessage += " ☀️";
-      if (weatherCondition === "snowy") contextMessage += " ❄️";
-      contextMessage += ` • ${Math.round(weatherData.main.temp)}°C`;
+      const weatherIcon =
+        weatherCondition === "rainy"
+          ? "☔"
+          : weatherCondition === "sunny"
+            ? "☀️"
+            : weatherCondition === "snowy"
+              ? "❄️"
+              : "";
+      contextMessage += ` • ${weatherCondition.charAt(0).toUpperCase() + weatherCondition.slice(1)} ${weatherIcon} ${Math.round(weatherData.main.temp)}°C`;
     }
 
-    console.log("Sending recommendations:", recommendations);
+    console.log(
+      `Returning ${formattedRecommendations.length} recommendations (isNewUser: ${isNewUser})`,
+    );
 
-    return res.json({
+    // ==================== 15. GENERATE CLEAR EXPLANATIONS ====================
+    // Log score details for top recommendations with full details
+    console.log("\n📊 === TOP RECOMMENDATIONS WITH EXPLANATIONS ===");
+    topRecommendations.slice(0, 5).forEach((food, idx) => {
+      console.log(`\n${idx + 1}. ${food.name}`);
+      console.log(`   Score: ${food.score.toFixed(4)}`);
+      console.log(
+        `   Reasons: ${food.reasons.join(" | ") || "No specific reason"}`,
+      );
+      if (food.scoreDetails) {
+        console.log(
+          `   Score Breakdown:`,
+          JSON.stringify(food.scoreDetails, null, 3),
+        );
+      }
+    });
+    console.log("\n=============================================");
+
+    // Format recently viewed items for response
+    const formattedRecentlyViewed = recentlyViewed.map((food) => ({
+      _id: food._id,
+      name: food.name,
+      description: food.description,
+      price: food.price,
+      image: food.image,
+      category: food.category,
+      rating: food.rating || 0,
+    }));
+
+    console.log(
+      `Recently viewed items count: ${formattedRecentlyViewed.length}`,
+      formattedRecentlyViewed,
+    );
+
+    // ==================== 16. RETURN RANKED LIST WITH EXPLANATIONS ====================
+    // Return the ranked list of recommended food items along with their explanations
+    const response = {
       success: true,
       data: {
-        recommendations,
+        // ✅ Recommendations with explanations
+        recommendations: formattedRecommendations,
+        // ✅ Recently viewed items
+        recentlyViewed: formattedRecentlyViewed,
+        // ✅ Context information
         timeOfDay,
         weatherCondition,
         temperature: weatherData?.main?.temp || null,
         weatherData: weatherData?.weather[0] || null,
-        userHistory,
+        // ✅ User information
+        userHistory: orderHistory.slice(0, 5).map((h) => h.name),
         contextMessage,
+        isNewUser,
+        dietaryPreferences: userData?.dietaryPreferences || [],
+        // ✅ Algorithm status
+        scoringMode: isNewUser
+          ? "cold-start (context + popularity)"
+          : "personalized (all factors)",
+        totalItemsProcessed: allFoods.length,
+        recommendationsReturned: formattedRecommendations.length,
       },
-    });
+    };
+
+    console.log("✅ RECOMMENDATION ALGORITHM COMPLETE");
+    console.log(`   Mode: ${response.data.scoringMode}`);
+    console.log(`   Items processed: ${response.data.totalItemsProcessed}`);
+    console.log(`   Items returned: ${response.data.recommendationsReturned}`);
+    console.log("========== RECOMMENDATION ALGORITHM END ==========\n");
+
+    return res.json(response);
   } catch (error) {
     console.error("Recommendation error:", error);
     return res.status(500).json({
@@ -216,4 +608,164 @@ const getRecommendations = async (req, res) => {
   }
 };
 
-export { getRecommendations };
+// ==================== TRACK VIEWED ITEMS ====================
+
+const trackRecentlyViewed = async (req, res) => {
+  try {
+    const { userId, foodId } = req.body;
+
+    console.log(
+      "Tracking recently viewed - userId:",
+      userId,
+      "foodId:",
+      foodId,
+    );
+
+    if (!userId || !foodId) {
+      return res.status(400).json({
+        success: false,
+        message: "userId and foodId are required",
+      });
+    }
+
+    const user = await userModel.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Initialize recentlyViewed if not exists
+    if (!user.recentlyViewed) {
+      user.recentlyViewed = [];
+    }
+
+    // Remove if already exists (to move to front)
+    const existingIndex = user.recentlyViewed.findIndex(
+      (id) => id.toString() === foodId.toString(),
+    );
+    if (existingIndex > -1) {
+      user.recentlyViewed.splice(existingIndex, 1);
+    }
+
+    // Add to beginning
+    user.recentlyViewed.unshift(foodId);
+
+    // Keep only last 20 items
+    user.recentlyViewed = user.recentlyViewed.slice(0, 20);
+
+    await user.save();
+
+    console.log(
+      "Recently viewed updated for user:",
+      userId,
+      "Total items:",
+      user.recentlyViewed.length,
+    );
+
+    return res.json({
+      success: true,
+      message: "Recently viewed updated",
+      data: { recentlyViewedCount: user.recentlyViewed.length },
+    });
+  } catch (error) {
+    console.error("Error tracking viewed item:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error tracking viewed item: " + error.message,
+    });
+  }
+};
+
+// ==================== GET POPULAR ITEMS ====================
+
+const getPopularItems = async (req, res) => {
+  try {
+    const { limit = 10, category } = req.query;
+
+    let query = {};
+    if (category) {
+      query.category = category;
+    }
+
+    const popularFoods = await foodModel
+      .find(query)
+      .sort({ orderCount: -1, rating: -1 })
+      .limit(parseInt(limit) || 10)
+      .lean();
+
+    return res.json({
+      success: true,
+      data: popularFoods.map((food) => ({
+        ...food,
+        reason: food.orderCount > 50 ? "Trending now" : "Popular choice",
+      })),
+    });
+  } catch (error) {
+    console.error("Error fetching popular items:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error fetching popular items: " + error.message,
+    });
+  }
+};
+
+// ==================== UPDATE DIETARY PREFERENCES ====================
+
+const updateDietaryPreferences = async (req, res) => {
+  try {
+    const { userId, preferences } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: "userId is required",
+      });
+    }
+
+    const validPreferences = [
+      "vegetarian",
+      "vegan",
+      "gluten-free",
+      "dairy-free",
+      "nut-free",
+      "halal",
+      "kosher",
+    ];
+    const filteredPreferences =
+      preferences?.filter((p) => validPreferences.includes(p)) || [];
+
+    const user = await userModel.findByIdAndUpdate(
+      userId,
+      { dietaryPreferences: filteredPreferences },
+      { new: true },
+    );
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: "Dietary preferences updated",
+      data: { dietaryPreferences: user.dietaryPreferences },
+    });
+  } catch (error) {
+    console.error("Error updating dietary preferences:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error updating preferences: " + error.message,
+    });
+  }
+};
+
+export {
+  getRecommendations,
+  trackRecentlyViewed,
+  getPopularItems,
+  updateDietaryPreferences,
+};

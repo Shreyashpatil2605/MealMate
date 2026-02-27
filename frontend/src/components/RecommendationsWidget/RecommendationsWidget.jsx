@@ -53,8 +53,10 @@ const RecommendationsWidget = () => {
   // Find food items matching recommendations
   const recommendedItems = recommendations.recommendations
     .slice(0, 4)
-    .map((foodName) =>
-      food_list.find((f) => f.name.toLowerCase() === foodName.toLowerCase()),
+    .map((recommendation) =>
+      food_list.find(
+        (f) => f.name.toLowerCase() === recommendation.name.toLowerCase(),
+      ),
     )
     .filter(Boolean);
 
