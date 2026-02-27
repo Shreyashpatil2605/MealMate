@@ -3,6 +3,7 @@ import "./Recommendations.css";
 import { StoreContext } from "../../context/StoreContext";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 
 const Recommendations = () => {
   const { url, token, userData } = useContext(StoreContext);
@@ -15,13 +16,13 @@ const Recommendations = () => {
 
   // Dietary preference options
   const dietaryOptions = [
-    { id: "vegetarian", label: "🥗 Vegetarian", icon: "🥗" },
-    { id: "vegan", label: "🌱 Vegan", icon: "🌱" },
-    { id: "gluten-free", label: "🌾 Gluten-Free", icon: "🌾" },
-    { id: "dairy-free", label: "🥛 Dairy-Free", icon: "🥛" },
-    { id: "nut-free", label: "🥜 Nut-Free", icon: "🥜" },
-    { id: "halal", label: "🍖 Halal", icon: "🍖" },
-    { id: "kosher", label: "✡️ Kosher", icon: "✡️" },
+    { id: "vegetarian", label: "Vegetarian",  },
+    { id: "vegan", label: "Vegan",  },
+    { id: "gluten-free", label: " Gluten-Free" },
+    { id: "dairy-free", label: " Dairy-Free" },
+    { id: "nut-free", label: " Nut-Free"},
+    { id: "halal", label: " Halal" },
+    { id: "kosher", label: " Kosher" },
   ];
 
   const [selectedPreferences, setSelectedPreferences] = useState([]);
@@ -89,15 +90,47 @@ const Recommendations = () => {
   // Save dietary preferences
   const savePreferences = async () => {
     try {
-      await axios.post(url + "/api/recommendation/preferences", {
-        userId: userData?._id,
-        preferences: selectedPreferences,
-      });
-      setShowPreferencesModal(false);
-      // Refresh recommendations
-      window.location.reload();
+      // Check if user is logged in
+      if (!token) {
+        toast.error("Please login to save preferences");
+        return;
+      }
+
+      if (selectedPreferences.length === 0) {
+        toast.warning("Please select at least one preference");
+        return;
+      }
+
+      // Use token from context to identify user
+      const response = await axios.post(
+        url + "/api/recommendation/preferences",
+        {
+          preferences: selectedPreferences,
+        },
+        {
+          headers: {
+            token: token, // Send token in header instead of userId in body
+          },
+        },
+      );
+
+      if (response.data.success) {
+        toast.success("Preferences saved successfully!");
+        setShowPreferencesModal(false);
+        // Refresh recommendations after 500ms to show updated preferences
+        setTimeout(() => {
+          window.location.reload();
+        }, 500);
+      } else {
+        toast.error(response.data.message || "Failed to save preferences");
+      }
     } catch (err) {
       console.error("Error saving preferences:", err);
+      const errorMsg =
+        err.response?.data?.message ||
+        err.message ||
+        "Error saving preferences";
+      toast.error(errorMsg);
     }
   };
 
@@ -212,7 +245,13 @@ const Recommendations = () => {
             <p>Set your dietary preferences to get better recommendations</p>
             <button
               className="cold-start-btn"
-              onClick={() => setShowPreferencesModal(true)}
+              onClick={() => {
+                if (!token) {
+                  toast.warning("Please login first to set preferences");
+                  return;
+                }
+                setShowPreferencesModal(true);
+              }}
             >
               Set Preferences
             </button>
@@ -349,31 +388,45 @@ const Recommendations = () => {
         <div className="preferences-modal-overlay">
           <div className="preferences-modal">
             <h2>🍽️ Set Your Dietary Preferences</h2>
-            <p>Select all that apply to you:</p>
-            <div className="preferences-options">
-              {dietaryOptions.map((option) => (
-                <label key={option.id} className="preference-option">
-                  <input
-                    type="checkbox"
-                    checked={selectedPreferences.includes(option.id)}
-                    onChange={() => handlePreferenceToggle(option.id)}
-                  />
-                  <span className="option-icon">{option.icon}</span>
-                  <span className="option-label">{option.label}</span>
-                </label>
-              ))}
-            </div>
-            <div className="modal-actions">
-              <button
-                className="skip-btn"
-                onClick={() => setShowPreferencesModal(false)}
-              >
-                Skip
-              </button>
-              <button className="save-btn" onClick={savePreferences}>
-                Save Preferences
-              </button>
-            </div>
+            {!token ? (
+              <div className="login-required-message">
+                <p>Please login to save your dietary preferences</p>
+                <button
+                  className="skip-btn"
+                  onClick={() => setShowPreferencesModal(false)}
+                >
+                  OK
+                </button>
+              </div>
+            ) : (
+              <>
+                <p>Select all that apply to you:</p>
+                <div className="preferences-options">
+                  {dietaryOptions.map((option) => (
+                    <label key={option.id} className="preference-option">
+                      <input
+                        type="checkbox"
+                        checked={selectedPreferences.includes(option.id)}
+                        onChange={() => handlePreferenceToggle(option.id)}
+                      />
+                      <span className="option-icon">{option.icon}</span>
+                      <span className="option-label">{option.label}</span>
+                    </label>
+                  ))}
+                </div>
+                <div className="modal-actions">
+                  <button
+                    className="skip-btn"
+                    onClick={() => setShowPreferencesModal(false)}
+                  >
+                    Skip
+                  </button>
+                  <button className="save-btn" onClick={savePreferences}>
+                    Save Preferences
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

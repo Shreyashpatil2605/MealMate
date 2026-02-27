@@ -715,12 +715,31 @@ const getPopularItems = async (req, res) => {
 
 const updateDietaryPreferences = async (req, res) => {
   try {
-    const { userId, preferences } = req.body;
+    // userId can come from either req.body (set by authMiddleware) or req.userId
+    const userId = req.body.userId || req.userId;
+    const { preferences } = req.body;
+
+    console.log("updateDietaryPreferences - Received body:", req.body);
+    console.log(
+      "updateDietaryPreferences - userId from body:",
+      req.body.userId,
+    );
+    console.log("updateDietaryPreferences - userId from req:", req.userId);
+    console.log("updateDietaryPreferences - Final userId:", userId);
+    console.log("updateDietaryPreferences - Preferences:", preferences);
 
     if (!userId) {
+      console.error("updateDietaryPreferences - userId is missing!");
       return res.status(400).json({
         success: false,
-        message: "userId is required",
+        message: "userId is required - Authentication failed",
+      });
+    }
+
+    if (!preferences || !Array.isArray(preferences)) {
+      return res.status(400).json({
+        success: false,
+        message: "Preferences must be an array",
       });
     }
 
@@ -733,9 +752,11 @@ const updateDietaryPreferences = async (req, res) => {
       "halal",
       "kosher",
     ];
-    const filteredPreferences =
-      preferences?.filter((p) => validPreferences.includes(p)) || [];
+    const filteredPreferences = preferences.filter((p) =>
+      validPreferences.includes(p),
+    );
 
+    console.log("Updating user with ID:", userId);
     const user = await userModel.findByIdAndUpdate(
       userId,
       { dietaryPreferences: filteredPreferences },
@@ -749,6 +770,7 @@ const updateDietaryPreferences = async (req, res) => {
       });
     }
 
+    console.log("Preferences updated successfully for user:", userId);
     return res.json({
       success: true,
       message: "Dietary preferences updated",

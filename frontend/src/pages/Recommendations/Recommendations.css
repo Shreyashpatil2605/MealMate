@@ -447,6 +447,18 @@
   text-align: center;
 }
 
+.login-required-message {
+  text-align: center;
+  padding: 20px;
+}
+
+.login-required-message p {
+  color: #ff6b35;
+  font-size: 16px;
+  margin-bottom: 20px;
+  font-weight: 500;
+}
+
 .preferences-modal > p {
   color: #999;
   text-align: center;
