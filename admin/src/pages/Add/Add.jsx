@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import "./Add.css";
 import { assets } from "../../assets/assets";
 import axios from "axios";
@@ -9,12 +9,63 @@ import { StoreContext } from "../../context/StoreContext";
 const Add = ({ url }) => {
   const { token } = useContext(StoreContext);
   const [image, setImage] = useState(false);
+  const [categories, setCategories] = useState([
+    "Salad",
+    "Rolls",
+    "Deserts",
+    "Sandwich",
+    "Cake",
+    "Pure Veg",
+    "Pasta",
+    "Noodles",
+  ]);
   const [data, setData] = useState({
     name: "",
     description: "",
     price: "",
     category: "Salad",
   });
+
+  // Fetch categories from API
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await axios.get(`${url}/api/menu/list`);
+        if (response.data.success && Array.isArray(response.data.data)) {
+          const menuCategories = response.data.data.map(
+            (item) => item.menu_name,
+          );
+          // Merge API categories with default ones, avoiding duplicates
+          const defaultCategories = [
+            "Salad",
+            "Rolls",
+            "Deserts",
+            "Sandwich",
+            "Cake",
+            "Pure Veg",
+            "Pasta",
+            "Noodles",
+          ];
+          const allCategories = [
+            ...menuCategories,
+            ...defaultCategories.filter((cat) => !menuCategories.includes(cat)),
+          ];
+          setCategories(allCategories);
+          // Update default category if not in the list
+          if (!allCategories.includes(data.category)) {
+            setData((prev) => ({
+              ...prev,
+              category: allCategories[0] || "Salad",
+            }));
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching categories:", error);
+        // Keep default categories if API fails
+      }
+    };
+    fetchCategories();
+  }, [url]);
 
   const onChangeHandler = (event) => {
     const name = event.target.name;
@@ -98,14 +149,11 @@ const Add = ({ url }) => {
               onChange={onChangeHandler}
               value={data.category}
             >
-              <option value="Salad">Salad</option>
-              <option value="Rolls">Rolls</option>
-              <option value="Deserts">Deserts</option>
-              <option value="Sandwich">Sandwich</option>
-              <option value="Cake">Cake</option>
-              <option value="Pure Veg">Pure Veg</option>
-              <option value="Pasta">Pasta</option>
-              <option value="Noodles">Noodles</option>
+              {categories.map((cat, index) => (
+                <option key={index} value={cat}>
+                  {cat}
+                </option>
+              ))}
             </select>
           </div>
           <div className="add-price flex-col">

@@ -530,8 +530,8 @@ const finalizeGroupOrder = async (req, res) => {
         const session = await stripe.checkout.sessions.create({
           line_items,
           mode: "payment",
-          success_url: `${frontendUrl}/verify?success=true&orderId=${newOrder._id}`,
-          cancel_url: `${frontendUrl}/verify?success=false&orderId=${newOrder._id}`,
+          success_url: `${frontendUrl}/verify?success=true&orderId=${newOrder._id}&groupCode=${groupCode}`,
+          cancel_url: `${frontendUrl}/verify?success=false&orderId=${newOrder._id}&groupCode=${groupCode}`,
         });
         sessionUrl = session.url;
       }
@@ -602,8 +602,8 @@ const finalizeGroupOrder = async (req, res) => {
         const session = await stripe.checkout.sessions.create({
           line_items,
           mode: "payment",
-          success_url: `${frontendUrl}/verify?success=true&orderId=${newOrder._id}`,
-          cancel_url: `${frontendUrl}/verify?success=false&orderId=${newOrder._id}`,
+          success_url: `${frontendUrl}/verify?success=true&orderId=${newOrder._id}&groupCode=${groupCode}`,
+          cancel_url: `${frontendUrl}/verify?success=false&orderId=${newOrder._id}&groupCode=${groupCode}`,
         });
         sessionUrl = session.url;
       }
@@ -891,6 +891,63 @@ const getChatMessages = async (req, res) => {
   }
 };
 
+// Mark individual payment as complete in a group order
+const completeGroupOrder = async (req, res) => {
+  try {
+    const { groupCode, orderId } = req.body;
+
+    if (!groupCode || !orderId) {
+      return res.json({
+        success: false,
+        message: "Group code and order ID required",
+      });
+    }
+
+    const groupOrder = await groupOrderModel.findOne({ groupCode });
+    if (!groupOrder) {
+      return res.json({ success: false, message: "Group order not found" });
+    }
+
+    // Find and mark the specific order as paid
+    const order = groupOrder.orders.find(
+      (o) => o.orderId === orderId || o.orderId.toString() === orderId
+    );
+    if (order) {
+      order.paid = true;
+    }
+
+    // Check if all members have paid
+    const allPaid = groupOrder.orders.every((o) => o.paid === true);
+    if (allPaid) {
+      groupOrder.status = "completed";
+    }
+
+    await groupOrder.save();
+
+    const io = req.app.get("io");
+    if (io) {
+      emitGroupUpdate(io, groupCode, "order-completed", {
+        groupCode,
+        orderId,
+        allPaid,
+        status: groupOrder.status,
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: "Order payment marked as complete",
+      data: { groupOrder, allPaid },
+    });
+  } catch (error) {
+    console.error("Error completing group order:", error);
+    return res.json({
+      success: false,
+      message: "Error completing group order",
+    });
+  }
+};
+
 export {
   createGroupOrder,
   joinGroupOrder,
@@ -904,4 +961,5 @@ export {
   checkTwilioConfig,
   saveChatMessage,
   getChatMessages,
+  completeGroupOrder,
 };

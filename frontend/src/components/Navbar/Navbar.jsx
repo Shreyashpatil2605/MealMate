@@ -111,15 +111,6 @@ const Navbar = ({ setShowLogin }) => {
         >
           suggestions
         </li>
-        <li>
-          <a
-            href="#app-download"
-            onClick={() => setMenu("mobile-app")}
-            className={menu === "mobile-app" ? "active" : ""}
-          >
-            mobile-app
-          </a>
-        </li>
         <li
           onClick={() => {
             setMenu("group-order");

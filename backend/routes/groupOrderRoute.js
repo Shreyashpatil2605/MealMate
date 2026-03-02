@@ -11,6 +11,7 @@ import {
   shareGroupLinkSms,
   checkTwilioConfig,
   getChatMessages,
+  completeGroupOrder,
 } from "../controllers/groupOrderController.js";
 
 const groupOrderRoute = express.Router();
@@ -22,6 +23,7 @@ groupOrderRoute.post("/remove-item", removeItemFromGroupOrder);
 groupOrderRoute.post("/update-quantity", updateItemQuantity);
 groupOrderRoute.post("/details", getGroupOrderDetails);
 groupOrderRoute.post("/finalize", finalizeGroupOrder);
+groupOrderRoute.post("/complete", completeGroupOrder);
 groupOrderRoute.post("/leave", leaveGroupOrder);
 groupOrderRoute.post("/share-sms", shareGroupLinkSms);
 groupOrderRoute.get("/check-twilio", checkTwilioConfig);
