@@ -10,6 +10,7 @@ import cartRouter from "./routes/cartRoute.js";
 import orderRouter from "./routes/orderRoute.js";
 import recommendationRoute from "./routes/recommendationRoute.js";
 import groupOrderRoute from "./routes/groupOrderRoute.js";
+import menuRouter from "./routes/menuRoute.js";
 import groupOrderModel from "./models/groupOrderModel.js";
 
 // app config
@@ -95,6 +96,7 @@ connectDB();
 
 // api endpoints
 app.use("/api/food", foodRouter);
+app.use("/api/menu", menuRouter);
 app.use("/images", express.static("uploads"));
 app.use("/api/user", userRouter);
 app.use("/api/cart", cartRouter);

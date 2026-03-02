@@ -9,12 +9,21 @@ const Verify = () => {
     const [searchParams,setSearchParams]=useSearchParams();
     const success=searchParams.get("success");
     const orderId=searchParams.get("orderId");
+    const groupCode=searchParams.get("groupCode");
     const {url} =useContext(StoreContext);
     const navigate= useNavigate();
 
     const verifyPayment=async()=>{
         const response= await axios.post(url+"/api/order/verify",{success,orderId});
         if(response.data.success){
+            // If this is a group order payment, mark it as complete
+            if(groupCode){
+                try {
+                    await axios.post(url+"/api/group-order/complete",{groupCode,orderId});
+                } catch(error){
+                    console.error("Error completing group order:",error);
+                }
+            }
             navigate("/myorders");
             toast.success("Order Placed Successfully");
         }else{
