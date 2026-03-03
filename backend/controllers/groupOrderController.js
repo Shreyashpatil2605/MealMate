@@ -441,6 +441,9 @@ const getGroupOrderDetails = async (req, res) => {
 // Finalize group order (before checkout)
 const finalizeGroupOrder = async (req, res) => {
   try {
+    console.log("=== Starting finalize group order ===");
+    console.log("Request body:", JSON.stringify(req.body, null, 2));
+
     const {
       groupCode,
       paymentOption = "split",
@@ -448,20 +451,35 @@ const finalizeGroupOrder = async (req, res) => {
       payerId,
     } = req.body;
 
+    // Validation
     if (!groupCode) {
       return res.json({ success: false, message: "Group code required" });
     }
 
+    if (!frontendUrl) {
+      return res.json({ success: false, message: "Frontend URL required" });
+    }
+
+    if (!process.env.STRIPE_SECRET_KEY) {
+      return res.json({
+        success: false,
+        message: "Stripe configuration missing",
+      });
+    }
+
+    console.log("Fetching group order for code:", groupCode);
     const groupOrder = await groupOrderModel.findOne({ groupCode });
     if (!groupOrder) {
       return res.json({ success: false, message: "Group order not found" });
     }
 
+    console.log("Group order found. Items count:", groupOrder.items.length);
     if (groupOrder.items.length === 0) {
       return res.json({ success: false, message: "Group order is empty" });
     }
 
     // Calculate split per user
+    console.log("Calculating split by user...");
     const splitByUser = {};
     let grandTotal = 0;
     groupOrder.items.forEach((item) => {
@@ -484,9 +502,13 @@ const finalizeGroupOrder = async (req, res) => {
       });
     });
 
+    console.log("Split calculation complete. Grand total:", grandTotal);
+    console.log("Users in split:", Object.keys(splitByUser));
+
     const paymentSessions = [];
 
     if (paymentOption === "single_payer") {
+      console.log("Processing single payer mode");
       if (!payerId) {
         return res.json({
           success: false,
@@ -496,8 +518,8 @@ const finalizeGroupOrder = async (req, res) => {
 
       const combinedItems = groupOrder.items.map((it) => ({
         name: it.itemName,
-        price: it.price,
-        quantity: it.quantity,
+        price: Number(it.price) || 0,
+        quantity: Number(it.quantity) || 0,
       }));
 
       const newOrder = new orderModel({
@@ -506,18 +528,27 @@ const finalizeGroupOrder = async (req, res) => {
         amount: Math.round(grandTotal * 100) / 100,
         address: req.body.address || {},
       });
+      console.log("Saving order for single payer:", payerId);
       await newOrder.save();
 
       let sessionUrl = null;
-      if (frontendUrl && process.env.STRIPE_SECRET_KEY) {
-        const line_items = combinedItems.map((item) => ({
-          price_data: {
-            currency: "inr",
-            product_data: { name: item.name },
-            unit_amount: Math.round(item.price * 100),
-          },
-          quantity: item.quantity,
-        }));
+      try {
+        const line_items = combinedItems
+          .filter((item) => item.price > 0 && item.quantity > 0)
+          .map((item) => ({
+            price_data: {
+              currency: "inr",
+              product_data: { name: item.name },
+              unit_amount: Math.round(item.price * 100),
+            },
+            quantity: item.quantity,
+          }));
+
+        // Validate line_items is not empty
+        if (line_items.length === 0) {
+          throw new Error("No valid items in order");
+        }
+
         line_items.push({
           price_data: {
             currency: "inr",
@@ -527,6 +558,10 @@ const finalizeGroupOrder = async (req, res) => {
           quantity: 1,
         });
 
+        console.log(
+          `Creating Stripe session (single payer) with ${line_items.length} items`,
+        );
+
         const session = await stripe.checkout.sessions.create({
           line_items,
           mode: "payment",
@@ -534,6 +569,10 @@ const finalizeGroupOrder = async (req, res) => {
           cancel_url: `${frontendUrl}/verify?success=false&orderId=${newOrder._id}&groupCode=${groupCode}`,
         });
         sessionUrl = session.url;
+        console.log("Stripe session created successfully");
+      } catch (stripeError) {
+        console.error("Stripe session creation error:", stripeError.message);
+        throw new Error(`Stripe error: ${stripeError.message}`);
       }
 
       groupOrder.orders = [
@@ -564,12 +603,27 @@ const finalizeGroupOrder = async (req, res) => {
     }
 
     // Default: split payments
+    console.log("Processing split payments mode");
+    groupOrder.orders = []; // Initialize orders array
     for (const [userId, data] of Object.entries(splitByUser)) {
+      console.log(
+        `Creating order for user: ${data.userName} (${userId}), amount: ${data.total}`,
+      );
+
       const itemsForUser = data.items.map((it) => ({
         name: it.itemName,
-        price: it.price,
-        quantity: it.quantity,
+        price: Number(it.price) || 0,
+        quantity: Number(it.quantity) || 0,
       }));
+
+      // Validate items have valid prices
+      const hasValidItems = itemsForUser.some(
+        (item) => item.price > 0 && item.quantity > 0,
+      );
+      if (!hasValidItems) {
+        throw new Error(`No valid items for user ${data.userName}`);
+      }
+
       const amount = Math.round(data.total * 100) / 100;
 
       const newOrder = new orderModel({
@@ -579,17 +633,28 @@ const finalizeGroupOrder = async (req, res) => {
         address: req.body.address || {},
       });
       await newOrder.save();
+      console.log(
+        `Order saved for user ${data.userName}. Order ID: ${newOrder._id}`,
+      );
 
       let sessionUrl = null;
-      if (frontendUrl && process.env.STRIPE_SECRET_KEY) {
-        const line_items = itemsForUser.map((item) => ({
-          price_data: {
-            currency: "inr",
-            product_data: { name: item.name },
-            unit_amount: Math.round(item.price * 100),
-          },
-          quantity: item.quantity,
-        }));
+      try {
+        const line_items = itemsForUser
+          .filter((item) => item.price > 0 && item.quantity > 0)
+          .map((item) => ({
+            price_data: {
+              currency: "inr",
+              product_data: { name: item.name },
+              unit_amount: Math.round(item.price * 100),
+            },
+            quantity: item.quantity,
+          }));
+
+        // Validate line_items is not empty
+        if (line_items.length === 0) {
+          throw new Error(`No valid line items for user ${data.userName}`);
+        }
+
         line_items.push({
           price_data: {
             currency: "inr",
@@ -599,6 +664,10 @@ const finalizeGroupOrder = async (req, res) => {
           quantity: 1,
         });
 
+        console.log(
+          `Creating Stripe session for user ${data.userName} with ${line_items.length} items`,
+        );
+
         const session = await stripe.checkout.sessions.create({
           line_items,
           mode: "payment",
@@ -606,6 +675,16 @@ const finalizeGroupOrder = async (req, res) => {
           cancel_url: `${frontendUrl}/verify?success=false&orderId=${newOrder._id}&groupCode=${groupCode}`,
         });
         sessionUrl = session.url;
+        console.log(`Stripe session created for ${data.userName}`);
+      } catch (stripeError) {
+        console.error(
+          "Stripe session creation error for user:",
+          userId,
+          stripeError.message,
+        );
+        throw new Error(
+          `Stripe error for user ${data.userName}: ${stripeError.message}`,
+        );
       }
 
       groupOrder.orders.push({
@@ -623,6 +702,7 @@ const finalizeGroupOrder = async (req, res) => {
       });
     }
 
+    console.log("Saving group order with completed status");
     groupOrder.status = "completed";
     await groupOrder.save();
 
@@ -633,16 +713,38 @@ const finalizeGroupOrder = async (req, res) => {
       paymentSessions,
     });
 
+    console.log("=== Finalization complete ===");
     return res.json({
       success: true,
       message: "Group finalized (split)",
       data: { groupOrder, paymentSessions },
     });
   } catch (error) {
-    console.error("Error finalizing group order:", error);
+    // Extract error information
+    let errorMessage =
+      error?.message || error?.toString() || "Unknown error occurred";
+
+    // Try to get more details
+    const errorDetails = {
+      message: errorMessage,
+      name: error?.name || "Error",
+      stack: error?.stack || "No stack trace",
+      code: error?.code || null,
+      errorType: typeof error,
+    };
+
+    console.error("=== ERROR CAUGHT IN FINALIZE ===");
+    console.error("Error message:", errorMessage);
+    console.error("Error name:", error?.name);
+    console.error("Error code:", error?.code);
+    console.error("Error details:", errorDetails);
+    console.error("Full error object:", error);
+    console.error("=== END ERROR ===");
+
     return res.json({
       success: false,
-      message: "Error finalizing group order",
+      message: error.message || "Error finalizing group order",
+      details: error.stack || error.message, // ⭐ IMPORTANT
     });
   }
 };
@@ -910,7 +1012,7 @@ const completeGroupOrder = async (req, res) => {
 
     // Find and mark the specific order as paid
     const order = groupOrder.orders.find(
-      (o) => o.orderId === orderId || o.orderId.toString() === orderId
+      (o) => o.orderId === orderId || o.orderId.toString() === orderId,
     );
     if (order) {
       order.paid = true;

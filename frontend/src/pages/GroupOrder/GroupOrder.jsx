@@ -60,35 +60,6 @@ const calculateTotals = (items) => {
 const GroupOrder = ({ setShowLogin }) => {
   const { url, food_list, token } = useContext(StoreContext);
 
-  // Authentication check - redirect to login if not authenticated
-  if (!token) {
-    return (
-      <div className="group-order-container" style={{ textAlign: "center", padding: "60px 20px" }}>
-        <h1 className="group-order-title">👥 Group Ordering</h1>
-        <div style={{ 
-          background: "rgba(50,50,50,0.6)", 
-          borderRadius: "16px", 
-          padding: "40px", 
-          maxWidth: "400px", 
-          margin: "40px auto",
-          border: "1px solid rgba(34,197,94,0.2)"
-        }}>
-          <h2 style={{ color: "#fff", marginBottom: "16px" }}>Authentication Required</h2>
-          <p style={{ color: "#999", marginBottom: "24px" }}>
-            You need to be logged in to create or join group orders.
-          </p>
-          <button 
-            onClick={() => setShowLogin(true)}
-            className="group-btn primary"
-            style={{ padding: "14px 32px", fontSize: "16px" }}
-          >
-            Sign Up / Login
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   // Memoized helper function to get full image URL
   const getImageUrl = useCallback(
     (image) => {
@@ -746,21 +717,49 @@ const GroupOrder = ({ setShowLogin }) => {
   const handleFinalizeSplit = async () => {
     try {
       setLoading(true);
+      console.log("Sending finalize request:", {
+        groupCode: currentGroup,
+        paymentOption: "split",
+        frontendUrl: window.location.origin,
+      });
+
       const response = await axios.post(url + "/api/group-order/finalize", {
         groupCode: currentGroup,
         paymentOption: "split",
         frontendUrl: window.location.origin,
       });
+
+      console.log("Finalize response:", response.data);
+
       if (response.data.success) {
         toast.success("Group finalized. Payment sessions created.");
         setPaymentSessions(response.data.data.paymentSessions || []);
         setGroupDetails(response.data.data.groupOrder || groupDetails);
       } else {
-        toast.error(response.data.message);
+        console.error("Finalize error response:", {
+          success: response.data.success,
+          message: response.data.message,
+          details: response.data.details,
+        });
+        console.log("Full response data:", response.data);
+
+        // Display detailed error message
+        if (response.data.details?.message) {
+          toast.error(`Error: ${response.data.details.message}`);
+        } else {
+          toast.error(response.data.message || "Error finalizing split");
+        }
       }
     } catch (error) {
-      console.error("Error finalizing split:", error);
-      toast.error("Error finalizing split");
+      console.error("Finalize request failed:");
+      console.error("Error message:", error.message);
+      console.error("Error response:", error.response?.data);
+      console.error("Full error:", error);
+      const errorMsg =
+        error.response?.data?.message ||
+        error.message ||
+        "Error finalizing split";
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -792,11 +791,16 @@ const GroupOrder = ({ setShowLogin }) => {
         if (sessionUrl) window.open(sessionUrl, "_blank");
         setGroupDetails(response.data.data.groupOrder || groupDetails);
       } else {
-        toast.error(response.data.message);
+        console.error("Finalize error:", response.data);
+        toast.error(response.data.message || "Error finalizing single payer");
       }
     } catch (error) {
       console.error("Error finalizing single payer:", error);
-      toast.error("Error finalizing single payer");
+      const errorMsg =
+        error.response?.data?.message ||
+        error.message ||
+        "Error finalizing single payer";
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -976,6 +980,42 @@ const GroupOrder = ({ setShowLogin }) => {
       </div>
     );
   };
+
+  // Authentication check - render after all hooks
+  if (!token) {
+    return (
+      <div
+        className="group-order-container"
+        style={{ textAlign: "center", padding: "60px 20px" }}
+      >
+        <h1 className="group-order-title">👥 Group Ordering</h1>
+        <div
+          style={{
+            background: "rgba(50,50,50,0.6)",
+            borderRadius: "16px",
+            padding: "40px",
+            maxWidth: "400px",
+            margin: "40px auto",
+            border: "1px solid rgba(34,197,94,0.2)",
+          }}
+        >
+          <h2 style={{ color: "#fff", marginBottom: "16px" }}>
+            Authentication Required
+          </h2>
+          <p style={{ color: "#999", marginBottom: "24px" }}>
+            You need to be logged in to create or join group orders.
+          </p>
+          <button
+            onClick={() => setShowLogin(true)}
+            className="group-btn primary"
+            style={{ padding: "14px 32px", fontSize: "16px" }}
+          >
+            Sign Up / Login
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Conditional render - NOW all hooks are called before this
   if (!currentGroup) {
@@ -1758,7 +1798,7 @@ const GroupOrder = ({ setShowLogin }) => {
             className="action-btn secondary"
             onClick={handleFinalizeSingle}
           >
-Finalize (Pay by Me)
+            Finalize (Pay by Me)
           </button>
           <button
             className="action-btn secondary"
