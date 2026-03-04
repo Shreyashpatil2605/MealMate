@@ -4,14 +4,27 @@ import Stripe from "stripe";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
+// Stripe minimum transaction amount (₹100 = ~$1.20 USD)
+const MINIMUM_ORDER_AMOUNT = 100;
+
 // placing user order for frontend
 const placeOrder = async (req, res) => {
   const frontend_url = "http://localhost:5173";
   try {
+    const amount = req.body.amount;
+
+    // Validate minimum order amount for Stripe
+    if (amount < MINIMUM_ORDER_AMOUNT) {
+      return res.json({
+        success: false,
+        message: `Minimum order amount is ₹${MINIMUM_ORDER_AMOUNT}. Current total: ₹${amount}. Please add more items to proceed.`,
+      });
+    }
+
     const newOrder = new orderModel({
       userId: req.body.userId,
       items: req.body.items,
-      amount: req.body.amount,
+      amount: amount,
       address: req.body.address,
     });
     await newOrder.save();

@@ -36,10 +36,12 @@ const calculateTotals = (items) => {
 
       splitByUser[item.userId].total += itemTotal;
       splitByUser[item.userId].items.push({
+        itemId: item.itemId,
         itemName: item.itemName,
         quantity: quantity,
         price: price,
         total: itemTotal,
+        addedAt: item.addedAt,
       });
     });
   }
@@ -675,7 +677,7 @@ const GroupOrder = ({ setShowLogin }) => {
   const handleShareWhatsApp = () => {
     const shareLink = `${window.location.origin}/group-order?code=${currentGroup}`;
     const text = encodeURIComponent(`Join my group order: ${shareLink}`);
-    window.open(`https://wa.me/?text=${text}`, "_blank");
+    window.open(`https://wa.me/?text=${text}`, "_blank", "noopener,noreferrer");
   };
 
   // Send SMS via server (Twilio) - only shown when Twilio is configured
@@ -716,6 +718,27 @@ const GroupOrder = ({ setShowLogin }) => {
   // Finalize group and create per-user orders (split)
   const handleFinalizeSplit = async () => {
     try {
+      // Validate minimum order amount
+      const minimumAmount = 100;
+      if (groupDetails?.grandTotal < minimumAmount) {
+        toast.error(
+          `Minimum order amount is ₹${minimumAmount}. Current total: ₹${groupDetails?.grandTotal}. Please add more items.`,
+        );
+        return;
+      }
+
+      // Validate each member's share
+      const insufficientShares = splitByUser?.filter(
+        (user) => user.subtotal < minimumAmount,
+      );
+      if (insufficientShares && insufficientShares.length > 0) {
+        const names = insufficientShares.map((u) => u.userName).join(", ");
+        toast.error(
+          `Cannot split payment: ${names} ${insufficientShares.length === 1 ? "has" : "have"} a share below ₹${minimumAmount}. Please add more items or use single payer option.`,
+        );
+        return;
+      }
+
       setLoading(true);
       console.log("Sending finalize request:", {
         groupCode: currentGroup,
@@ -776,6 +799,16 @@ const GroupOrder = ({ setShowLogin }) => {
         toast.error("You are not a member of this group");
         return;
       }
+
+      // Validate minimum order amount
+      const minimumAmount = 100;
+      if (groupDetails?.grandTotal < minimumAmount) {
+        toast.error(
+          `Minimum order amount is ₹${minimumAmount}. Current total: ₹${groupDetails?.grandTotal}. Please add more items before payment.`,
+        );
+        return;
+      }
+
       setLoading(true);
       const response = await axios.post(url + "/api/group-order/finalize", {
         groupCode: currentGroup,
@@ -788,7 +821,7 @@ const GroupOrder = ({ setShowLogin }) => {
         const sessionUrl =
           response.data.data.sessionUrl ||
           (response.data.data.groupOrder?.orders || [])[0]?.sessionUrl;
-        if (sessionUrl) window.open(sessionUrl, "_blank");
+        if (sessionUrl) window.open(sessionUrl, "_blank", "noopener,noreferrer");
         setGroupDetails(response.data.data.groupOrder || groupDetails);
       } else {
         console.error("Finalize error:", response.data);
@@ -1763,7 +1796,7 @@ const GroupOrder = ({ setShowLogin }) => {
                   </div>
                   {s.sessionUrl ? (
                     <button
-                      onClick={() => window.open(s.sessionUrl, "_blank")}
+                      onClick={() => window.open(s.sessionUrl, "_blank", "noopener,noreferrer")}
                       className="pay-now-btn"
                       style={{
                         padding: "10px 20px",

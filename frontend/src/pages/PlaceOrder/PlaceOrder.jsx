@@ -51,7 +51,7 @@ const PlaceOrder = () => {
       const { session_url } = response.data;
       window.location.replace(session_url);
     } else {
-      toast.error("Errors!");
+      toast.error(response.data.message || "Error placing order");
     }
   };
 
@@ -61,6 +61,9 @@ const PlaceOrder = () => {
       navigate("/cart");
     } else if (getTotalCartAmount() === 0) {
       toast.error("Please Add Items to Cart");
+      navigate("/cart");
+    } else if (getTotalCartAmount() < 100) {
+      toast.error("Minimum order amount is ₹100. Please add more items.");
       navigate("/cart");
     }
   }, [token]);
