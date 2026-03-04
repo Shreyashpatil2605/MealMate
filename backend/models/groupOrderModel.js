@@ -53,7 +53,7 @@ const groupOrderSchema = new mongoose.Schema({
     type: Date,
     default: () => new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
   },
-// Orders created when group is finalized
+  // Orders created when group is finalized
   orders: [
     {
       userId: String,
@@ -75,6 +75,46 @@ const groupOrderSchema = new mongoose.Schema({
       },
     },
   ],
+  // Payment coordination reference
+  paymentCoordinationId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "paymentCoordination",
+  },
+  // Payment settings
+  paymentSettings: {
+    splitMethod: {
+      type: String,
+      enum: ["equal", "custom", "proportional"],
+      default: "equal",
+    },
+    paymentDeadline: Date,
+    autoReminder: {
+      type: Boolean,
+      default: true,
+    },
+    reminderIntervalHours: {
+      type: Number,
+      default: 2,
+    },
+  },
+  // Settlement tracking
+  settlement: {
+    totalAmount: Number,
+    completedAmount: {
+      type: Number,
+      default: 0,
+    },
+    pendingAmount: Number,
+    completionPercentage: {
+      type: Number,
+      default: 0,
+    },
+    allPaymentsReceived: {
+      type: Boolean,
+      default: false,
+    },
+    settlementCompletedAt: Date,
+  },
 });
 
 const groupOrderModel =
