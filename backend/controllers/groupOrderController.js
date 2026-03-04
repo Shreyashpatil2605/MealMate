@@ -404,10 +404,12 @@ const getGroupOrderDetails = async (req, res) => {
 
         splitByUser[item.userId].total += itemTotal;
         splitByUser[item.userId].items.push({
+          itemId: item.itemId,
           itemName: item.itemName,
           quantity: quantity,
           price: price,
           total: itemTotal,
+          addedAt: item.addedAt,
         });
       });
     }
@@ -499,6 +501,7 @@ const finalizeGroupOrder = async (req, res) => {
         quantity: item.quantity,
         price: item.price,
         total: itemTotal,
+        addedAt: item.addedAt,
       });
     });
 
@@ -516,6 +519,20 @@ const finalizeGroupOrder = async (req, res) => {
         });
       }
 
+      const amount = Math.round(grandTotal * 100) / 100;
+
+      // Validate minimum order amount for Stripe
+      if (amount < 100) {
+        return res.json({
+          success: false,
+          message: `Order total (₹${amount}) is below the minimum amount of ₹100. Please add more items to proceed with payment.`,
+          details: {
+            currentTotal: amount,
+            minimumRequired: 100,
+          },
+        });
+      }
+
       const combinedItems = groupOrder.items.map((it) => ({
         name: it.itemName,
         price: Number(it.price) || 0,
@@ -525,7 +542,7 @@ const finalizeGroupOrder = async (req, res) => {
       const newOrder = new orderModel({
         userId: payerId,
         items: combinedItems,
-        amount: Math.round(grandTotal * 100) / 100,
+        amount: amount,
         address: req.body.address || {},
       });
       console.log("Saving order for single payer:", payerId);
@@ -625,6 +642,22 @@ const finalizeGroupOrder = async (req, res) => {
       }
 
       const amount = Math.round(data.total * 100) / 100;
+
+      // Validate minimum order amount for Stripe
+      if (amount < 100) {
+        console.warn(
+          `Order amount ₹${amount} for user ${data.userName} is below Stripe minimum of ₹100`,
+        );
+        return res.json({
+          success: false,
+          message: `User ${data.userName}'s share (₹${amount}) is below the minimum order amount of ₹100. Please add more items or increase order value.`,
+          details: {
+            userName: data.userName,
+            userAmount: amount,
+            minimumRequired: 100,
+          },
+        });
+      }
 
       const newOrder = new orderModel({
         userId,
@@ -808,7 +841,6 @@ const leaveGroupOrder = async (req, res) => {
 const shareGroupLinkSms = async (req, res) => {
   try {
     const { groupCode, phoneNumber, frontendUrl } = req.body;
-
     if (!groupCode || !phoneNumber) {
       return res.json({
         success: false,

@@ -70,7 +70,36 @@ const Cart = () => {
               </b>
             </div>
           </div>
-          <button onClick={() => navigate("/order")}>
+          {getTotalCartAmount() < 100 && getTotalCartAmount() > 0 && (
+            <div
+              style={{
+                marginTop: "10px",
+                padding: "8px 10px",
+                backgroundColor: "#fff3cd",
+                color: "#856404",
+                borderRadius: "4px",
+                fontSize: "12px",
+                border: "1px solid #ffeaa7",
+              }}
+            >
+              Minimum order amount is ₹100. Add ₹{100 - getTotalCartAmount()} more
+              to proceed.
+            </div>
+          )}
+          <button
+            onClick={() => navigate("/order")}
+            disabled={getTotalCartAmount() < 100 && getTotalCartAmount() > 0}
+            style={{
+              opacity:
+                getTotalCartAmount() < 100 && getTotalCartAmount() > 0
+                  ? 0.5
+                  : 1,
+              cursor:
+                getTotalCartAmount() < 100 && getTotalCartAmount() > 0
+                  ? "not-allowed"
+                  : "pointer",
+            }}
+          >
             PROCEED TO CHECKOUT
           </button>
         </div>

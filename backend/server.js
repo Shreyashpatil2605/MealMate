@@ -91,6 +91,12 @@ io.on("connection", (socket) => {
 app.use(express.json());
 app.use(cors());
 
+// Add COOP header to allow opening cross-origin popups
+app.use((req, res, next) => {
+  res.header("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
+  next();
+});
+
 // DB connection
 connectDB();
 
