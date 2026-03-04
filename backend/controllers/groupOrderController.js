@@ -1,5 +1,7 @@
 import groupOrderModel from "../models/groupOrderModel.js";
 import orderModel from "../models/orderModel.js";
+import paymentCoordinationModel from "../models/paymentCoordinationModel.js";
+import PaymentReminderService from "../utils/paymentReminderService.js";
 import Stripe from "stripe";
 import twilio from "twilio";
 
@@ -704,6 +706,42 @@ const finalizeGroupOrder = async (req, res) => {
 
     console.log("Saving group order with completed status");
     groupOrder.status = "completed";
+
+    // Initialize payment coordination for split payments
+    let paymentCoord = null;
+    try {
+      paymentCoord = new paymentCoordinationModel({
+        groupCode,
+        groupOrderId: groupOrder._id,
+        totalAmount: grandTotal,
+        splitMethod: "proportional",
+        payments: paymentSessions.map((session) => {
+          const member = groupOrder.members.find(
+            (m) => m.userId === session.userId,
+          );
+          return {
+            userId: session.userId,
+            userName: session.userName,
+            email: member?.email || "",
+            phoneNumber: member?.phoneNumber || "",
+            amount: session.amount,
+            status: "pending",
+            paymentMethod: "stripe",
+          };
+        }),
+        status: "initiated",
+        settlementDetails: {
+          startedAt: new Date(),
+        },
+      });
+
+      await paymentCoord.save();
+      groupOrder.paymentCoordinationId = paymentCoord._id;
+      console.log(`Payment coordination initialized for group ${groupCode}`);
+    } catch (coordError) {
+      console.error("Error initializing payment coordination:", coordError);
+    }
+
     await groupOrder.save();
 
     const io = req.app.get("io");
@@ -745,6 +783,352 @@ const finalizeGroupOrder = async (req, res) => {
       success: false,
       message: error.message || "Error finalizing group order",
       details: error.stack || error.message, // ⭐ IMPORTANT
+    });
+  }
+};
+
+// Create a new Stripe payment session for a specific user
+const createPaymentSession = async (req, res) => {
+  try {
+    const { groupCode, userId } = req.body;
+
+    if (!groupCode || !userId) {
+      return res.json({
+        success: false,
+        message: "Group code and user ID required",
+      });
+    }
+
+    // Find the group order
+    const groupOrder = await groupOrderModel.findOne({ groupCode });
+    if (!groupOrder) {
+      return res.json({ success: false, message: "Group order not found" });
+    }
+
+    // Find the payment coordination
+    const paymentCoord = await paymentCoordinationModel.findOne({
+      groupCode,
+    });
+    if (!paymentCoord) {
+      return res.json({
+        success: false,
+        message: "Payment coordination not found",
+      });
+    }
+
+    // Find user's payment details
+    const userPayment = paymentCoord.payments.find((p) => p.userId === userId);
+    if (!userPayment) {
+      return res.json({
+        success: false,
+        message: "User not found in this group payment",
+      });
+    }
+
+    if (userPayment.status === "paid") {
+      return res.json({
+        success: true,
+        message: "User already paid",
+        data: { status: "paid" },
+      });
+    }
+
+    // Find the order for this user
+    const order = groupOrder.orders.find((o) => o.userId === userId);
+    if (!order) {
+      return res.json({
+        success: false,
+        message: "Order not found for this user",
+      });
+    }
+
+    // Create Stripe session with metadata for webhook processing
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      line_items: order.items.map((item) => ({
+        price_data: {
+          currency: "inr",
+          product_data: {
+            name: item.name,
+          },
+          unit_amount: Math.round(item.price * 100),
+        },
+        quantity: item.quantity,
+      })),
+      mode: "payment",
+      // CRITICAL: Include metadata for webhook to identify payment
+      payment_intent_data: {
+        metadata: {
+          groupCode,
+          userId,
+          userName: userPayment.userName,
+        },
+      },
+      success_url: `${process.env.FRONTEND_URL || "http://localhost:5173"}/group-order/${groupCode}/payment?session_id={CHECKOUT_SESSION_ID}&success=true`,
+      cancel_url: `${process.env.FRONTEND_URL || "http://localhost:5173"}/group-order/${groupCode}/payment?cancelled=true`,
+      metadata: {
+        groupCode,
+        userId,
+      },
+    });
+
+    console.log(
+      `✅ Stripe session created for user ${userId} in group ${groupCode}: ${session.id}`,
+    );
+
+    return res.json({
+      success: true,
+      data: {
+        sessionId: session.id,
+        sessionUrl: session.url,
+        amount: userPayment.amount,
+        userName: userPayment.userName,
+      },
+    });
+  } catch (error) {
+    console.error("Error creating payment session:", error);
+    return res.json({
+      success: false,
+      message: error.message || "Error creating payment session",
+    });
+  }
+};
+
+// Mark payment as complete and place order when all payments received
+const confirmPayment = async (req, res) => {
+  try {
+    const { groupCode, orderId, userId, transactionId, receiptUrl } = req.body;
+
+    if (!groupCode || !orderId || !userId) {
+      return res.json({
+        success: false,
+        message: "Group code, order ID, and user ID required",
+      });
+    }
+
+    // Find group order
+    const groupOrder = await groupOrderModel.findOne({ groupCode });
+    if (!groupOrder) {
+      return res.json({
+        success: false,
+        message: "Group order not found",
+      });
+    }
+
+    // Find the order
+    const order = await orderModel.findById(orderId);
+    if (!order) {
+      return res.json({
+        success: false,
+        message: "Order not found",
+      });
+    }
+
+    // Mark order as paid
+    order.payment = true;
+    await order.save();
+
+    // Update group order
+    const groupOrderItem = groupOrder.orders.find(
+      (o) => o.orderId === orderId || o.orderId.toString() === orderId,
+    );
+    if (groupOrderItem) {
+      groupOrderItem.paid = true;
+    }
+
+    // Initialize or update payment coordination
+    let coordination = null;
+    if (groupOrder.paymentCoordinationId) {
+      coordination = await paymentCoordinationModel.findById(
+        groupOrder.paymentCoordinationId,
+      );
+    }
+
+    if (coordination) {
+      // Update payment status in coordination
+      const paymentIndex = coordination.payments.findIndex(
+        (p) => p.userId === userId,
+      );
+      if (paymentIndex !== -1) {
+        coordination.payments[paymentIndex].status = "completed";
+        coordination.payments[paymentIndex].completedAt = new Date();
+        if (transactionId) {
+          coordination.payments[paymentIndex].transactionId = transactionId;
+        }
+        if (receiptUrl) {
+          coordination.payments[paymentIndex].receiptUrl = receiptUrl;
+        }
+      }
+
+      // Calculate completion percentage
+      const completedCount = coordination.payments.filter(
+        (p) => p.status === "completed",
+      ).length;
+      coordination.completionPercentage = Math.round(
+        (completedCount / coordination.payments.length) * 100,
+      );
+
+      // Update status
+      const allCompleted = coordination.payments.every(
+        (p) => p.status === "completed",
+      );
+      if (allCompleted) {
+        coordination.status = "completed";
+        coordination.settlementDetails.completedAt = new Date();
+        coordination.settlementDetails.allPaymentsReceived = true;
+      } else {
+        coordination.status = "in-progress";
+      }
+
+      await coordination.save();
+
+      // Emit real-time update
+      const io = req.app.get("io");
+      if (io) {
+        // Notify all members about payment update
+        emitGroupUpdate(io, groupCode, "payment-status-updated", {
+          groupCode,
+          userId,
+          status: "completed",
+          completionPercentage: coordination.completionPercentage,
+          paidMembersCount: completedCount,
+          totalMembers: coordination.payments.length,
+          allPaid: allCompleted,
+        });
+
+        // If all paid, notify settlement complete
+        if (allCompleted) {
+          emitGroupUpdate(io, groupCode, "settlement-complete", {
+            groupCode,
+            message: "All payments received! Order being placed...",
+          });
+        }
+      }
+    }
+
+    // Check if all orders are paid
+    const allPaid = groupOrder.orders.every((o) => o.paid === true);
+
+    if (allPaid) {
+      console.log(
+        `All payments received for group ${groupCode}. Placing order...`,
+      );
+      // Update group order status to finalized for actual order placement
+      groupOrder.status = "paid";
+      await groupOrder.save();
+
+      // Emit final confirmation
+      const io = req.app.get("io");
+      emitGroupUpdate(io, groupCode, "all-payments-received", {
+        groupCode,
+        message: "All members have paid! Your order is being prepared.",
+      });
+    } else {
+      await groupOrder.save();
+    }
+
+    return res.json({
+      success: true,
+      message: "Payment confirmed",
+      data: {
+        orderId,
+        paid: true,
+        allPaid,
+        completionPercentage: coordination?.completionPercentage || 0,
+      },
+    });
+  } catch (error) {
+    console.error("Error confirming payment:", error);
+    return res.json({
+      success: false,
+      message: "Error confirming payment",
+    });
+  }
+};
+
+// Get payment status for all members in group
+const getGroupPaymentStatus = async (req, res) => {
+  try {
+    const { groupCode } = req.body;
+
+    if (!groupCode) {
+      return res.json({
+        success: false,
+        message: "Group code required",
+      });
+    }
+
+    const groupOrder = await groupOrderModel.findOne({ groupCode });
+    if (!groupOrder) {
+      return res.json({
+        success: false,
+        message: "Group order not found",
+      });
+    }
+
+    // Get payment status from payment coordination model
+    const paymentCoord = await paymentCoordinationModel.findOne({ groupCode });
+
+    if (!paymentCoord) {
+      // Fallback to old payment structure if coordination doesn't exist
+      const paymentStatus = {
+        groupCode,
+        totalMembers: groupOrder.members.length,
+        payments: groupOrder.orders.map((order) => {
+          const member = groupOrder.members.find(
+            (m) => m.userId === order.userId,
+          );
+          return {
+            userId: order.userId,
+            userName: member?.userName || "Unknown",
+            amount: order.amount,
+            paid: order.paid,
+            orderId: order.orderId,
+          };
+        }),
+        allPaid: groupOrder.orders.every((o) => o.paid === true),
+        paidCount: groupOrder.orders.filter((o) => o.paid === true).length,
+      };
+
+      return res.json({
+        success: true,
+        data: paymentStatus,
+      });
+    }
+
+    // Use payment coordination data (more accurate)
+    const paidCount = paymentCoord.payments.filter(
+      (p) => p.status === "paid",
+    ).length;
+    const totalMembers = paymentCoord.payments.length;
+    const allPaid = paidCount === totalMembers;
+
+    const paymentStatus = {
+      groupCode,
+      totalMembers,
+      payments: paymentCoord.payments.map((payment) => ({
+        userId: payment.userId,
+        userName: payment.userName,
+        amount: payment.amount,
+        paid: payment.status === "paid",
+        paidAt: payment.paidAt,
+        transactionId: payment.transactionId,
+      })),
+      paidCount,
+      allPaid,
+      completionPercentage: Math.round((paidCount / totalMembers) * 100),
+      coordinationStatus: paymentCoord.status,
+    };
+
+    return res.json({
+      success: true,
+      data: paymentStatus,
+    });
+  } catch (error) {
+    console.error("Error getting payment status:", error);
+    return res.json({
+      success: false,
+      message: "Error getting payment status",
     });
   }
 };
@@ -1064,4 +1448,7 @@ export {
   saveChatMessage,
   getChatMessages,
   completeGroupOrder,
+  confirmPayment,
+  getGroupPaymentStatus,
+  createPaymentSession,
 };
